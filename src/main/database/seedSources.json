@@ -1,0 +1,200 @@
+[
+  {
+    "name": "Smashing Magazine",
+    "feedUrl": "https://www.smashingmagazine.com/feed/",
+    "siteUrl": "https://www.smashingmagazine.com",
+    "category": "web"
+  },
+  {
+    "name": "web.dev",
+    "feedUrl": "https://web.dev/feed.xml",
+    "siteUrl": "https://web.dev",
+    "category": "web"
+  },
+  {
+    "name": "Chrome for Developers",
+    "feedUrl": "https://developer.chrome.com/static/blog/feed.xml",
+    "siteUrl": "https://developer.chrome.com/blog",
+    "category": "web"
+  },
+  {
+    "name": "WebKit Blog",
+    "feedUrl": "https://webkit.org/feed/",
+    "siteUrl": "https://webkit.org/blog/",
+    "category": "web"
+  },
+  {
+    "name": "CSS-Tricks",
+    "feedUrl": "https://css-tricks.com/feed/",
+    "siteUrl": "https://css-tricks.com",
+    "category": "web"
+  },
+  {
+    "name": "React Blog",
+    "feedUrl": "https://react.dev/rss.xml",
+    "siteUrl": "https://react.dev/blog",
+    "category": "web"
+  },
+  {
+    "name": "Node.js Blog",
+    "feedUrl": "https://nodejs.org/en/feed/blog.xml",
+    "siteUrl": "https://nodejs.org/en/blog",
+    "category": "web"
+  },
+  {
+    "name": "Angular Blog",
+    "feedUrl": "https://blog.angular.dev/feed",
+    "siteUrl": "https://blog.angular.dev",
+    "category": "web"
+  },
+  {
+    "name": "Astro Blog",
+    "feedUrl": "https://astro.build/rss.xml",
+    "siteUrl": "https://astro.build/blog/",
+    "category": "web"
+  },
+  {
+    "name": "Laravel News",
+    "feedUrl": "https://laravel-news.com/feed",
+    "siteUrl": "https://laravel-news.com",
+    "category": "web"
+  },
+  {
+    "name": "Symfony Blog",
+    "feedUrl": "https://feeds.feedburner.com/symfony/blog",
+    "siteUrl": "https://symfony.com/blog/",
+    "category": "web"
+  },
+  {
+    "name": "JavaScript Weekly",
+    "feedUrl": "https://javascriptweekly.com/rss/",
+    "siteUrl": "https://javascriptweekly.com",
+    "category": "web"
+  },
+  {
+    "name": "Frontend Focus",
+    "feedUrl": "https://frontendfoc.us/rss",
+    "siteUrl": "https://frontendfoc.us",
+    "category": "web"
+  },
+  {
+    "name": "Node Weekly",
+    "feedUrl": "https://nodeweekly.com/rss/",
+    "siteUrl": "https://nodeweekly.com",
+    "category": "web"
+  },
+  {
+    "name": "Grafikart",
+    "feedUrl": "https://grafikart.fr/feed.rss",
+    "siteUrl": "https://grafikart.fr",
+    "category": "web"
+  },
+  {
+    "name": "Alsacreations",
+    "feedUrl": "https://www.alsacreations.com/rss/actualites.xml",
+    "siteUrl": "https://www.alsacreations.com",
+    "category": "web"
+  },
+  {
+    "name": "Rust Blog",
+    "feedUrl": "https://blog.rust-lang.org/feed.xml",
+    "siteUrl": "https://blog.rust-lang.org",
+    "category": "software"
+  },
+  {
+    "name": "Go Blog",
+    "feedUrl": "https://go.dev/blog/feed.atom",
+    "siteUrl": "https://go.dev/blog",
+    "category": "software"
+  },
+  {
+    "name": "Python Insider",
+    "feedUrl": "https://blog.python.org/rss.xml",
+    "siteUrl": "https://blog.python.org",
+    "category": "software"
+  },
+  {
+    "name": "GitHub Engineering",
+    "feedUrl": "https://github.blog/engineering/feed/",
+    "siteUrl": "https://github.blog/engineering/",
+    "category": "software"
+  },
+  {
+    "name": "Martin Fowler",
+    "feedUrl": "https://martinfowler.com/feed.atom",
+    "siteUrl": "https://martinfowler.com",
+    "category": "software"
+  },
+  {
+    "name": "Stack Overflow Blog",
+    "feedUrl": "https://stackoverflow.blog/feed/",
+    "siteUrl": "https://stackoverflow.blog",
+    "category": "software"
+  },
+  {
+    "name": "InfoQ",
+    "feedUrl": "https://feed.infoq.com/",
+    "siteUrl": "https://www.infoq.com",
+    "category": "software"
+  },
+  {
+    "name": "The Pragmatic Engineer",
+    "feedUrl": "https://blog.pragmaticengineer.com/rss/",
+    "siteUrl": "https://blog.pragmaticengineer.com",
+    "category": "software"
+  },
+  {
+    "name": "Simon Willison",
+    "feedUrl": "https://simonwillison.net/atom/everything/",
+    "siteUrl": "https://simonwillison.net",
+    "category": "software"
+  },
+  {
+    "name": "Julia Evans",
+    "feedUrl": "https://jvns.ca/atom.xml",
+    "siteUrl": "https://jvns.ca",
+    "category": "software"
+  },
+  {
+    "name": "Sfeir",
+    "feedUrl": "https://www.sfeir.dev/rss/",
+    "siteUrl": "https://www.sfeir.dev",
+    "category": "software"
+  },
+  {
+    "name": "OCTO Talks",
+    "feedUrl": "https://blog.octo.com/feed/",
+    "siteUrl": "https://blog.octo.com",
+    "category": "software"
+  },
+  {
+    "name": "Hacker News (150+ points)",
+    "feedUrl": "https://hnrss.org/frontpage?points=150",
+    "siteUrl": "https://news.ycombinator.com",
+    "category": "general"
+  },
+  {
+    "name": "Lobsters",
+    "feedUrl": "https://lobste.rs/rss",
+    "siteUrl": "https://lobste.rs",
+    "category": "general"
+  },
+  {
+    "name": "Journal du Hacker",
+    "feedUrl": "https://www.journalduhacker.net/rss",
+    "siteUrl": "https://www.journalduhacker.net",
+    "category": "general"
+  },
+  {
+    "name": "The Changelog",
+    "feedUrl": "https://changelog.com/feed",
+    "siteUrl": "https://changelog.com",
+    "category": "general"
+  },
+  {
+    "name": "DEV Community - Programming",
+    "feedUrl": "https://dev.to/feed/tag/programming",
+    "siteUrl": "https://dev.to/t/programming",
+    "category": "general"
+  }
+]

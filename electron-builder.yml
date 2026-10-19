@@ -1,0 +1,16 @@
+appId: fr.ekaufmann.devflux
+productName: DevFlux
+directories:
+  buildResources: resources
+  output: ../build
+files:
+  - out/**
+  - package.json
+asarUnpack:
+  - node_modules/better-sqlite3/**
+linux:
+  target:
+    - AppImage
+  category: Development
+  executableName: devflux
+  synopsis: Veille technologique quotidienne

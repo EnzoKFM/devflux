@@ -1,0 +1,50 @@
+{
+  "name": "devflux",
+  "productName": "DevFlux",
+  "version": "0.1.0",
+  "description": "Veille technologique quotidienne sur le développement web et logiciel",
+  "main": "./out/main/index.js",
+  "author": "ekaufmann",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "start": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "postinstall": "electron-builder install-app-deps",
+    "dist": "electron-vite build && electron-builder --linux"
+  },
+  "dependencies": {
+    "@electron-toolkit/preload": "3.0.2",
+    "@electron-toolkit/utils": "4.0.0",
+    "@extractus/feed-extractor": "8.0.3",
+    "@mozilla/readability": "0.6.0",
+    "better-sqlite3": "13.0.3",
+    "linkedom": "0.18.13"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@tailwindcss/vite": "4.3.3",
+    "@types/better-sqlite3": "9.6.0",
+    "@types/node": "22.20.5",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "dompurify": "3.4.17",
+    "electron": "44.8.0",
+    "electron-builder": "26.15.3",
+    "electron-vite": "6.0.0",
+    "eslint": "10.13.0",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.2",
+    "vite": "8.3.4",
+    "vitest": "5.0.5"
+  }
+}

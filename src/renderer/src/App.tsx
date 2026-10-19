@@ -70,7 +70,7 @@ export default function App() {
 
   if (profileResource.status === 'loading') {
     return (
-      <p role="status" className="flex h-full items-center justify-center text-sm text-slate-500">
+      <p role="status" className="flex h-full items-center justify-center text-sm text-slate-500 dark:text-slate-400">
         Chargement de votre profil…
       </p>
     )
@@ -79,7 +79,7 @@ export default function App() {
   if (profileResource.status === 'error') {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-4 px-6">
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900">DevFlux</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">DevFlux</h1>
         <div className="flex w-full max-w-md flex-col items-center gap-4">
           <ErrorBanner message={`Impossible de charger votre profil. ${profileResource.errorMessage}`} />
           <button

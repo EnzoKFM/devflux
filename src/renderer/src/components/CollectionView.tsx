@@ -33,7 +33,7 @@ export function CollectionView({ collectionKind, patchedArticlesOf, applyArticle
 
   if (articlesResource.status === 'loading') {
     return (
-      <p role="status" className="px-6 py-6 text-sm text-slate-500">
+      <p role="status" className="px-6 py-6 text-sm text-slate-500 dark:text-slate-400">
         Chargement…
       </p>
     )
@@ -42,7 +42,7 @@ export function CollectionView({ collectionKind, patchedArticlesOf, applyArticle
   if (articlesResource.status === 'error') {
     return (
       <div role="alert" className="flex flex-col items-start gap-3 px-6 py-6">
-        <p className="text-sm text-red-700">Impossible de charger « {presentation.title} ». {articlesResource.errorMessage}</p>
+        <p className="text-sm text-red-700 dark:text-red-300">Impossible de charger « {presentation.title} ». {articlesResource.errorMessage}</p>
         <button
           type="button"
           onClick={articlesResource.reload}

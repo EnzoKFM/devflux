@@ -16,7 +16,7 @@ export function ToggleSwitch({ isChecked, isDisabled = false, label, onChange }:
       disabled={isDisabled}
       onClick={() => onChange(!isChecked)}
       className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
-        isChecked ? 'bg-indigo-600' : 'bg-slate-300'
+        isChecked ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'
       }`}
     >
       <span

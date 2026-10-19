@@ -67,6 +67,10 @@ export interface AutostartStatus {
   isEnabled: boolean
 }
 
+export const THEME_PREFERENCES = ['system', 'light', 'dark'] as const
+
+export type ThemePreference = (typeof THEME_PREFERENCES)[number]
+
 export type TopicPreference = 'followed' | 'neutral' | 'muted'
 
 export type RecommendationMode = 'cold-start' | 'similarity' | 'trained' | 'unavailable'
@@ -113,6 +117,8 @@ export interface DevFluxApi {
   removeSource(sourceId: number): Promise<void>
   getAutostartStatus(): Promise<AutostartStatus>
   setAutostartEnabled(isEnabled: boolean): Promise<AutostartStatus>
+  getThemePreference(): Promise<ThemePreference>
+  setThemePreference(themePreference: ThemePreference): Promise<ThemePreference>
   getUserProfile(): Promise<UserProfile>
   completeOnboarding(followedTopicIds: string[]): Promise<UserProfile>
   setTopicPreference(topicId: string, preference: TopicPreference): Promise<UserProfile>
@@ -136,6 +142,8 @@ export const IPC_CHANNELS = {
   removeSource: 'sources:remove',
   getAutostartStatus: 'autostart:get-status',
   setAutostartEnabled: 'autostart:set-enabled',
+  getThemePreference: 'theme:get-preference',
+  setThemePreference: 'theme:set-preference',
   getUserProfile: 'profile:get',
   completeOnboarding: 'profile:complete-onboarding',
   setTopicPreference: 'profile:set-topic-preference'

@@ -349,6 +349,28 @@ describe('recommandation locale dans le fil', () => {
     expect(digest.articles.slice(0, 3).every((article) => article.url.includes('/python-'))).toBe(true)
   })
 
+  it('exclut du fil les articles dont le sujet le plus proche est masqué', async () => {
+    const database = createTestDatabase()
+    database.prepare("INSERT INTO topic_preferences (topic_id, preference) VALUES ('python', 'followed')").run()
+    database.prepare("INSERT INTO topic_preferences (topic_id, preference) VALUES ('php', 'muted')").run()
+    seedTopicArticles(database, 'python', 3, 1)
+    seedTopicArticles(database, 'php', 3, 1)
+    const embeddingProvider = createKeywordEmbeddingProvider(['python', 'php'])
+
+    const digest = await prepareDailyDigest(database, {
+      fetchFeed: emptyFeedFetcher,
+      now: () => FIXED_NOW,
+      embeddingProvider,
+      random: () => 0
+    })
+
+    expect(digest.articles.map((article) => article.url.split('/').at(-1)).sort()).toEqual([
+      'python-1',
+      'python-2',
+      'python-3'
+    ])
+  })
+
   it('fait passer un article en français devant un article anglais de pertinence égale', async () => {
     const database = createTestDatabase()
     database.prepare("INSERT INTO topic_preferences (topic_id, preference) VALUES ('python', 'followed')").run()

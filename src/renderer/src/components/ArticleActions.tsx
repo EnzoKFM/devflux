@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from 'react'
+import { useImperativeHandle, useState, type KeyboardEvent, type Ref } from 'react'
 import type { DigestArticle, FeedbackReason } from '@shared/contract'
 import type { ArticleActionHandlers } from '@renderer/hooks/useArticleActions'
 import { ReasonPicker } from './ReasonPicker'
@@ -23,8 +23,8 @@ function ActionButton({ icon, label, accessibleLabel, isActive = false, isToggle
       aria-pressed={isToggle ? isActive : undefined}
       className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-sm transition-colors ${
         isActive
-          ? 'border-indigo-300 bg-indigo-50 text-indigo-800'
-          : 'border-transparent text-slate-600 hover:bg-slate-100'
+          ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50 dark:bg-indigo-950 text-indigo-800 dark:text-indigo-200'
+          : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
       }`}
     >
       <span aria-hidden="true">{icon}</span>
@@ -33,13 +33,19 @@ function ActionButton({ icon, label, accessibleLabel, isActive = false, isToggle
   )
 }
 
+export interface ArticleRatingTriggers {
+  like: () => void
+  dislike: () => void
+}
+
 interface ArticleActionsProps {
   article: DigestArticle
   actions: ArticleActionHandlers
   isCompact: boolean
+  ratingTriggersRef?: Ref<ArticleRatingTriggers>
 }
 
-export function ArticleActions({ article, actions, isCompact }: ArticleActionsProps) {
+export function ArticleActions({ article, actions, isCompact, ratingTriggersRef }: ArticleActionsProps) {
   const [isReasonPickerOpen, setIsReasonPickerOpen] = useState(false)
   const showLabel = !isCompact
 
@@ -56,6 +62,8 @@ export function ArticleActions({ article, actions, isCompact }: ArticleActionsPr
     }
     setIsReasonPickerOpen((isOpen) => !isOpen)
   }
+
+  useImperativeHandle(ratingTriggersRef, () => ({ like: handleLikeClick, dislike: handleDislikeClick }))
 
   const handleReasonChosen = (reason: FeedbackReason | null): void => {
     setIsReasonPickerOpen(false)

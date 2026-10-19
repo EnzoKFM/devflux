@@ -13,9 +13,9 @@ export function AffinityGauge({ affinity }: AffinityGaugeProps) {
       role="img"
       aria-label={label}
       title={label}
-      className="relative h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-slate-200"
+      className="relative h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"
     >
-      <span aria-hidden="true" className="absolute inset-y-0 left-1/2 w-px bg-slate-400" />
+      <span aria-hidden="true" className="absolute inset-y-0 left-1/2 w-px bg-slate-400 dark:bg-slate-500" />
       {tone === 'positive' && (
         <span
           aria-hidden="true"

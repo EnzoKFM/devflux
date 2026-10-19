@@ -12,17 +12,17 @@ export function PreparationScreen({ progress, errorMessage, onRetry }: Preparati
 
   return (
     <div className="flex h-full flex-col items-center justify-center gap-6 px-6">
-      <h1 className="text-3xl font-bold tracking-tight text-slate-900">DevFlux</h1>
+      <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">DevFlux</h1>
       {errorMessage === null ? (
         <div className="w-full max-w-md" role="status" aria-live="polite">
-          <p className="mb-3 text-center text-sm text-slate-600">{label}</p>
+          <p className="mb-3 text-center text-sm text-slate-600 dark:text-slate-400">{label}</p>
           <div
             role="progressbar"
             aria-label="Préparation du fil du jour"
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={percentage}
-            className="h-2 w-full overflow-hidden rounded-full bg-slate-200"
+            className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700"
           >
             <div
               className="h-full rounded-full bg-indigo-600 transition-all duration-300"
@@ -32,7 +32,7 @@ export function PreparationScreen({ progress, errorMessage, onRetry }: Preparati
         </div>
       ) : (
         <div className="flex w-full max-w-md flex-col items-center gap-4" role="alert">
-          <p className="text-center text-sm text-red-700">
+          <p className="text-center text-sm text-red-700 dark:text-red-300">
             La préparation du fil du jour a échoué. {errorMessage}
           </p>
           <button

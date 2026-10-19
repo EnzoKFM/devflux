@@ -1,4 +1,4 @@
-import type { FeedbackReason, SourceCategory } from '@shared/contract'
+import type { FeedbackReason, SourceCategory, TopicPreference } from '@shared/contract'
 
 export interface FeedbackReasonChoice {
   reason: FeedbackReason | null
@@ -21,7 +21,7 @@ export const SOURCE_CATEGORY_LABELS: Record<SourceCategory, string> = {
 
 export const SOURCE_CATEGORIES = Object.keys(SOURCE_CATEGORY_LABELS) as SourceCategory[]
 
-export type ViewId = 'today' | 'read-later' | 'favorites' | 'sources' | 'settings'
+export type ViewId = 'today' | 'read-later' | 'favorites' | 'profile' | 'sources' | 'settings'
 
 export interface NavigationItem {
   viewId: ViewId
@@ -32,6 +32,22 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
   { viewId: 'today', label: 'Aujourd’hui' },
   { viewId: 'read-later', label: 'Plus tard' },
   { viewId: 'favorites', label: 'Favoris' },
+  { viewId: 'profile', label: 'Mon profil' },
   { viewId: 'sources', label: 'Sources' },
   { viewId: 'settings', label: 'Réglages' }
+]
+
+export const EXPLORATION_BADGE_LABEL = 'Découverte'
+
+export const EXPLORATION_BADGE_DESCRIPTION = 'Article proposé hors de vos habitudes pour élargir votre veille'
+
+export interface TopicPreferenceChoice {
+  preference: TopicPreference
+  label: string
+}
+
+export const TOPIC_PREFERENCE_CHOICES: TopicPreferenceChoice[] = [
+  { preference: 'followed', label: 'Suivi' },
+  { preference: 'neutral', label: 'Neutre' },
+  { preference: 'muted', label: 'Masqué' }
 ]

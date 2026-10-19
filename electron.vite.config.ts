@@ -7,7 +7,15 @@ const sharedAlias = { '@shared': resolve('src/shared') }
 
 export default defineConfig({
   main: {
-    resolve: { alias: sharedAlias }
+    resolve: { alias: sharedAlias },
+    build: {
+      rollupOptions: {
+        input: {
+          index: resolve('src/main/index.ts'),
+          embeddingWorker: resolve('src/main/recommendation/embeddingWorker.ts')
+        }
+      }
+    }
   },
   preload: {
     resolve: { alias: sharedAlias }

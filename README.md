@@ -15,6 +15,7 @@ DevFlux se lance au démarrage du PC, récupère les flux RSS de ses sources, co
 | `npm install` | Installe les dépendances |
 | `npm run dev` | Lance l'application en mode développement |
 | `npm test` | Lance les tests (vitest) |
+| `npm run test:model` | Lance le test d'intégration du moteur d'embeddings avec le vrai modèle (téléchargé au premier lancement dans `${XDG_CACHE_HOME:-~/.cache}/devflux-test-models`, ou dans `DEVFLUX_TEST_MODEL_CACHE` si défini) |
 | `npm run typecheck` | Vérifie les types |
 | `npm run lint` | Lance ESLint |
 | `npm run dist` | Construit l'AppImage dans `../build` |
@@ -32,10 +33,24 @@ Depuis un terminal intégré à VS Code, la variable `ELECTRON_RUN_AS_NODE=1` pe
 - **Préparation** :
   1. Purge des articles de plus de 14 jours, sauf les favoris, les « plus tard » et les articles notés.
   2. Collecte des sources actives.
-  3. Sélection en tourniquet : un article par source et par tour, du plus récent au plus ancien, avec au plus 4 articles par source.
+  3. Analyse : calcul des embeddings des nouveaux articles et des sujets (voir **Recommandation locale**).
+  4. Sélection des 20 articles, avec au plus 4 articles par source.
 - **Articles vus** : un article affiché dans un fil n'est jamais reproposé. Le bouton « Plus tard » permet de le garder.
-- **Notes** : les 👍 / 👎 et leur raison sont conservés dans la table `feedback`. Ils alimenteront la recommandation locale de la phase 2.
+- **Notes** : les 👍 / 👎 et leur raison sont conservés dans la table `feedback` et pris en compte dès le fil du lendemain.
+- **Premier lancement** : choix des sujets suivis, modifiables ensuite dans **Mon profil** (Suivi / Neutre / Masqué).
 - **Données** : base SQLite dans `~/.config/DevFlux/devflux.sqlite`.
+
+## Recommandation locale
+
+- **Modèle** : `Xenova/paraphrase-multilingual-MiniLM-L12-v2`, multilingue (français et anglais comparés dans le même espace), épinglé sur la révision `2c4055b12046f11709e9df2c122e59ffbdc2f900` (q8, environ 130 Mo), téléchargé une seule fois dans `~/.config/DevFlux/models`. Il tourne dans un processus séparé (`utilityProcess`), lancé seulement pendant l'analyse puis arrêté : pic mesuré d'environ 550 Mo pendant quelques secondes.
+- **Signaux** : 👍 et sujets suivis attirent ; 👎 « hors sujet », « trop basique » ou sans raison et sujets masqués repoussent ; « déjà vu » est neutre ; « mauvaise source » pénalise uniquement la source.
+- **Priorité au français** : les articles détectés en français (mots outils du titre et du résumé) reçoivent un bonus de score de 0,05 dans les modes `similarity` et `trained`.
+- **Modes** :
+  - `cold-start` (ni note ni sujet) : sélection en tourniquet, un article par source et par tour, du plus récent au plus ancien ;
+  - `similarity` : ressemblance avec les centroïdes positif et négatif, affinité de la source et fraîcheur ;
+  - `trained` (dès 20 notes de contenu, dont 5 de chaque sorte) : régression logistique réentraînée à chaque fil ;
+  - `unavailable` : échec du modèle (erreur journalisée), repli sur le tourniquet.
+- **Diversité** : 2 articles « Découverte » sur 20, quasi-doublons écartés.
 
 ## Architecture
 
@@ -43,6 +58,8 @@ Depuis un terminal intégré à VS Code, la variable `ELECTRON_RUN_AS_NODE=1` pe
 |---|---|
 | `src/shared/contract.ts` | Types et canaux IPC partagés |
 | `src/main/` | Processus principal : base, collecte, fil du jour, extraction d'article, démarrage automatique, IPC |
+| `src/main/recommendation/` | Embeddings (worker), score, régression logistique, sélection |
+| `src/main/profile/` | Catalogue des sujets et profil |
 | `src/preload/` | Pont `window.devflux` |
 | `src/renderer/` | Interface React (Tailwind) ; le contenu des articles est assaini avec DOMPurify |
 | `src/main/database/seedSources.json` | Sources de départ, insérées au premier lancement |

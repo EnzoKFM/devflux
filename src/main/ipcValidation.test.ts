@@ -5,7 +5,10 @@ import {
   parseHttpUrlArgument,
   parseIdentifier,
   parseRating,
-  parseReason
+  parseReason,
+  parseTopicId,
+  parseTopicIds,
+  parseTopicPreference
 } from './ipcValidation'
 
 describe('validation des arguments IPC', () => {
@@ -36,6 +39,27 @@ describe('validation des arguments IPC', () => {
     expect(parseHttpUrlArgument('https://example.com/a', 'url')).toBe('https://example.com/a')
     for (const invalidUrl of ['file:///etc/passwd', 'javascript:alert(1)', 'example.com', 42, null]) {
       expect(() => parseHttpUrlArgument(invalidUrl, 'url')).toThrow('url')
+    }
+  })
+
+  it('n accepte que des identifiants de sujets du catalogue', () => {
+    expect(parseTopicId('rust', 'topicId')).toBe('rust')
+    for (const invalidTopicId of ['inconnu', '', 3, null, undefined, { id: 'rust' }]) {
+      expect(() => parseTopicId(invalidTopicId, 'topicId')).toThrow('topicId')
+    }
+    expect(parseTopicIds(['rust', 'security'], 'followedTopicIds')).toEqual(['rust', 'security'])
+    expect(parseTopicIds([], 'followedTopicIds')).toEqual([])
+    expect(() => parseTopicIds(['rust', 'inconnu'], 'followedTopicIds')).toThrow('followedTopicIds')
+    expect(() => parseTopicIds('rust', 'followedTopicIds')).toThrow('followedTopicIds')
+    expect(() => parseTopicIds(Array(500).fill('rust'), 'followedTopicIds')).toThrow('followedTopicIds')
+  })
+
+  it('valide les préférences de sujet', () => {
+    expect(parseTopicPreference('followed')).toBe('followed')
+    expect(parseTopicPreference('neutral')).toBe('neutral')
+    expect(parseTopicPreference('muted')).toBe('muted')
+    for (const invalidPreference of ['autre', '', null, undefined, 1]) {
+      expect(() => parseTopicPreference(invalidPreference)).toThrow('preference')
     }
   })
 })

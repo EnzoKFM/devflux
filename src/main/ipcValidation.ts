@@ -1,9 +1,11 @@
-import type { FeedbackRating, FeedbackReason, SourceCategory } from '@shared/contract'
+import type { FeedbackRating, FeedbackReason, SourceCategory, TopicPreference } from '@shared/contract'
 import { parseHttpUrl } from './httpUrl'
+import { isTopicId, TOPIC_CATALOG } from './profile/topicCatalog'
 
 const FEEDBACK_RATINGS: readonly FeedbackRating[] = ['like', 'dislike']
 const FEEDBACK_REASONS: readonly FeedbackReason[] = ['off-topic', 'too-basic', 'already-seen', 'bad-source']
 const SOURCE_CATEGORIES: readonly SourceCategory[] = ['web', 'software', 'general']
+const TOPIC_PREFERENCES: readonly TopicPreference[] = ['followed', 'neutral', 'muted']
 
 export function parseIdentifier(value: unknown, argumentName: string): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value <= 0) {
@@ -49,4 +51,27 @@ export function parseHttpUrlArgument(value: unknown, argumentName: string): stri
     throw new Error(`Argument invalide : ${argumentName} doit être une URL http ou https.`)
   }
   return parsedUrl.href
+}
+
+export function parseTopicId(value: unknown, argumentName: string): string {
+  if (!isTopicId(value)) {
+    throw new Error(`Argument invalide : ${argumentName} doit être l'identifiant d'un sujet du catalogue.`)
+  }
+  return value
+}
+
+export function parseTopicIds(value: unknown, argumentName: string): string[] {
+  if (!Array.isArray(value) || value.length > TOPIC_CATALOG.length) {
+    throw new Error(
+      `Argument invalide : ${argumentName} doit être un tableau d'au plus ${TOPIC_CATALOG.length} identifiants de sujets.`
+    )
+  }
+  return value.map((topicId) => parseTopicId(topicId, argumentName))
+}
+
+export function parseTopicPreference(value: unknown): TopicPreference {
+  if (typeof value !== 'string' || !(TOPIC_PREFERENCES as readonly string[]).includes(value)) {
+    throw new Error(`Argument invalide : preference doit être l'une des valeurs ${TOPIC_PREFERENCES.join(', ')}.`)
+  }
+  return value as TopicPreference
 }

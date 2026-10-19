@@ -4,6 +4,7 @@ import type { ArticleActionHandlers } from '@renderer/hooks/useArticleActions'
 import { formatAbsoluteDate, formatRelativeDate } from '@renderer/lib/formatDate'
 import { ArticleActions } from './ArticleActions'
 import { ArticleContentBody } from './ArticleContentBody'
+import { ExplorationBadge } from './ExplorationBadge'
 
 interface ArticleReaderProps {
   article: DigestArticle
@@ -97,6 +98,7 @@ export function ArticleReader({ article, actions }: ArticleReaderProps) {
           <time dateTime={article.publishedAt} title={formatAbsoluteDate(article.publishedAt)}>
             {formatRelativeDate(article.publishedAt)}
           </time>
+          {article.isExploration && <ExplorationBadge />}
         </p>
         <div className="mt-3">
           <ArticleActions key={article.id} article={article} actions={actions} isCompact={false} />

@@ -3,18 +3,28 @@ import { DAILY_DIGEST_SIZE, type DailyDigest, type PreparationProgress } from '@
 import { computeOldestAllowedPublicationDate } from '../collector/articleAge'
 import { collectFeeds } from '../collector/feedCollector'
 import type { FeedFetcher } from '../collector/feedFetcher'
+import type { EmbeddingProvider } from '../recommendation/embeddingProvider'
+import { resolveEmbeddingModelId } from '../recommendation/embeddingStep'
 import {
-  assignDigestDate,
+  analyzeForRecommendation,
+  recordLastDigestMode
+} from '../recommendation/recommendationService'
+import { selectByRecommendation, type RecommendedSelectionOptions } from '../recommendation/recommendedSelection'
+import { MAX_DIGEST_ARTICLES_PER_SOURCE } from '../recommendation/selection'
+import {
+  assignDigestSelections,
   listArticlesByDigestDate,
   listDigestCandidates,
-  purgeArticlesPublishedBefore
+  purgeArticlesPublishedBefore,
+  type DigestCandidate,
+  type DigestSelection
 } from '../repositories/articleRepository'
 import { listEnabledSources } from '../repositories/sourceRepository'
 
-export const MAX_DIGEST_ARTICLES_PER_SOURCE = 4
-
 export interface PrepareDailyDigestOptions {
   fetchFeed?: FeedFetcher
+  embeddingProvider?: EmbeddingProvider
+  random?: () => number
   now?: () => Date
   onProgress?: (progress: PreparationProgress) => void
 }
@@ -30,8 +40,7 @@ export function purgeExpiredArticles(database: Database.Database, now: Date): nu
   return purgeArticlesPublishedBefore(database, computeOldestAllowedPublicationDate(now))
 }
 
-export function buildDigest(database: Database.Database, now: Date, digestDate: string): void {
-  const candidates = listDigestCandidates(database, computeOldestAllowedPublicationDate(now))
+function selectByRoundRobin(candidates: DigestCandidate[]): DigestSelection[] {
   const selectedArticleIds = new Set<number>()
 
   for (
@@ -52,7 +61,21 @@ export function buildDigest(database: Database.Database, now: Date, digestDate: 
     }
   }
 
-  assignDigestDate(database, [...selectedArticleIds], digestDate)
+  return [...selectedArticleIds].map((articleId) => ({ articleId, rank: null, isExploration: false }))
+}
+
+export function buildDigest(
+  database: Database.Database,
+  now: Date,
+  digestDate: string,
+  candidates: DigestCandidate[],
+  recommendation: Omit<RecommendedSelectionOptions, 'database' | 'candidates' | 'now'> | null = null
+): void {
+  const digestSelections = recommendation
+    ? selectByRecommendation({ ...recommendation, database, candidates, now })
+    : selectByRoundRobin(candidates)
+
+  assignDigestSelections(database, digestSelections, digestDate)
 }
 
 export async function prepareDailyDigest(
@@ -81,8 +104,28 @@ export async function prepareDailyDigest(
     onSourceProcessed: (completedSourceCount) => reportProgress('collecting', completedSourceCount)
   })
 
+  const candidates = listDigestCandidates(database, computeOldestAllowedPublicationDate(now()))
+  const recommendationAnalysis = await analyzeForRecommendation(database, candidates, options.embeddingProvider, {
+    onAnalysisStarted: () => reportProgress('analyzing', totalSourceCount),
+    onModelDownloadRequired: () => reportProgress('downloading-model', totalSourceCount)
+  })
+
   reportProgress('building-digest', totalSourceCount)
-  buildDigest(database, now(), digestDate)
+  buildDigest(
+    database,
+    now(),
+    digestDate,
+    candidates,
+    recommendationAnalysis.mode === 'similarity' || recommendationAnalysis.mode === 'trained'
+      ? {
+          recommendationSignals: recommendationAnalysis.recommendationSignals,
+          isTrainedMode: recommendationAnalysis.mode === 'trained',
+          modelId: resolveEmbeddingModelId(options.embeddingProvider),
+          random: options.random ?? Math.random
+        }
+      : null
+  )
+  recordLastDigestMode(database, recommendationAnalysis.mode)
 
   reportProgress('done', totalSourceCount)
   return {

@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3'
 import type { DigestArticle, FeedbackRating, FeedbackReason } from '@shared/contract'
+import { SOURCE_KEY_SELECT } from './sourceKeySql'
 
 interface ArticleRow {
   id: number
@@ -12,6 +13,7 @@ interface ArticleRow {
   read_at: string | null
   is_favorite: number
   is_read_later: number
+  is_exploration: number
   rating: FeedbackRating | null
   reason: FeedbackReason | null
 }
@@ -29,18 +31,30 @@ export interface NewArticle {
 export interface DigestCandidate {
   id: number
   sourceKey: string
+  title: string
+  summary: string | null
+  publishedAt: string
+}
+
+export interface DigestSelection {
+  articleId: number
+  rank: number | null
+  isExploration: boolean
 }
 
 const ARTICLE_SELECT = `
   SELECT
     articles.id, articles.source_id, articles.title, articles.url, articles.summary, articles.source_name,
-    articles.published_at, articles.read_at, articles.is_favorite, articles.is_read_later,
+    articles.published_at, articles.read_at, articles.is_favorite, articles.is_read_later, articles.is_exploration,
     feedback.rating, feedback.reason
   FROM articles
   LEFT JOIN feedback ON feedback.article_id = articles.id
 `
 
 const ARTICLE_ORDER = 'ORDER BY articles.published_at DESC, articles.id DESC'
+
+const DIGEST_ARTICLE_ORDER =
+  'ORDER BY articles.digest_rank IS NULL, articles.digest_rank ASC, articles.published_at DESC, articles.id DESC'
 
 function mapArticleRow(articleRow: ArticleRow): DigestArticle {
   return {
@@ -53,6 +67,7 @@ function mapArticleRow(articleRow: ArticleRow): DigestArticle {
     isRead: articleRow.read_at !== null,
     isFavorite: articleRow.is_favorite === 1,
     isReadLater: articleRow.is_read_later === 1,
+    isExploration: articleRow.is_exploration === 1,
     rating: articleRow.rating,
     feedbackReason: articleRow.reason
   }
@@ -85,7 +100,7 @@ export function findArticleById(database: Database.Database, articleId: number):
 
 export function listArticlesByDigestDate(database: Database.Database, digestDate: string): DigestArticle[] {
   const articleRows = database
-    .prepare(`${ARTICLE_SELECT} WHERE articles.digest_date = ? ${ARTICLE_ORDER}`)
+    .prepare(`${ARTICLE_SELECT} WHERE articles.digest_date = ? ${DIGEST_ARTICLE_ORDER}`)
     .all(digestDate) as ArticleRow[]
   return articleRows.map(mapArticleRow)
 }
@@ -107,22 +122,46 @@ export function listFavoriteArticles(database: Database.Database): DigestArticle
 export function listDigestCandidates(database: Database.Database, publishedSince: string): DigestCandidate[] {
   const candidateRows = database
     .prepare(
-      `SELECT articles.id, COALESCE(CAST(articles.source_id AS TEXT), articles.source_name) AS source_key
+      `SELECT articles.id, ${SOURCE_KEY_SELECT},
+              articles.title, articles.summary, articles.published_at
        FROM articles
        WHERE articles.digest_date IS NULL
          AND articles.published_at >= ?
          AND NOT EXISTS (SELECT 1 FROM feedback WHERE feedback.article_id = articles.id)
        ORDER BY articles.published_at DESC, articles.id DESC`
     )
-    .all(publishedSince) as { id: number; source_key: string }[]
-  return candidateRows.map((candidateRow) => ({ id: candidateRow.id, sourceKey: candidateRow.source_key }))
+    .all(publishedSince) as {
+    id: number
+    source_key: string
+    title: string
+    summary: string | null
+    published_at: string
+  }[]
+  return candidateRows.map((candidateRow) => ({
+    id: candidateRow.id,
+    sourceKey: candidateRow.source_key,
+    title: candidateRow.title,
+    summary: candidateRow.summary,
+    publishedAt: candidateRow.published_at
+  }))
 }
 
-export function assignDigestDate(database: Database.Database, articleIds: number[], digestDate: string): void {
-  const assignStatement = database.prepare('UPDATE articles SET digest_date = ? WHERE id = ?')
+export function assignDigestSelections(
+  database: Database.Database,
+  digestSelections: DigestSelection[],
+  digestDate: string
+): void {
+  const assignStatement = database.prepare(
+    'UPDATE articles SET digest_date = ?, digest_rank = ?, is_exploration = ? WHERE id = ?'
+  )
   database.transaction(() => {
-    for (const articleId of articleIds) {
-      assignStatement.run(digestDate, articleId)
+    for (const digestSelection of digestSelections) {
+      assignStatement.run(
+        digestDate,
+        digestSelection.rank,
+        digestSelection.isExploration ? 1 : 0,
+        digestSelection.articleId
+      )
     }
   })()
 }

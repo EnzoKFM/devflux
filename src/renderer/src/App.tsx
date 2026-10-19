@@ -1,15 +1,19 @@
 import { useState } from 'react'
 import { CollectionView } from './components/CollectionView'
+import { ErrorBanner } from './components/ErrorBanner'
 import { NavigationBar } from './components/NavigationBar'
+import { OnboardingScreen } from './components/OnboardingScreen'
 import { PreparationScreen } from './components/PreparationScreen'
+import { ProfileView } from './components/ProfileView'
 import { SettingsView } from './components/SettingsView'
 import { SourcesView } from './components/SourcesView'
 import { TodayView } from './components/TodayView'
 import { useArticlePatches } from './hooks/useArticlePatches'
 import { useDailyDigest } from './hooks/useDailyDigest'
+import { useUserProfile } from './hooks/useUserProfile'
 import type { ViewId } from './lib/labels'
 
-export default function App() {
+function MainApplication() {
   const { digestResource, preparationProgress, retryPreparation } = useDailyDigest()
   const { applyArticlePatch, applyPatchesToArticles } = useArticlePatches()
   const [currentViewId, setCurrentViewId] = useState<ViewId>('today')
@@ -44,6 +48,8 @@ export default function App() {
             applyArticlePatch={applyArticlePatch}
           />
         )
+      case 'profile':
+        return <ProfileView />
       case 'sources':
         return <SourcesView />
       case 'settings':
@@ -57,4 +63,47 @@ export default function App() {
       <main className="min-w-0 flex-1">{renderCurrentView()}</main>
     </div>
   )
+}
+
+export default function App() {
+  const { profileResource, isCompletingOnboarding, actionErrorMessage, completeOnboarding } = useUserProfile()
+
+  if (profileResource.status === 'loading') {
+    return (
+      <p role="status" className="flex h-full items-center justify-center text-sm text-slate-500">
+        Chargement de votre profil…
+      </p>
+    )
+  }
+
+  if (profileResource.status === 'error') {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-4 px-6">
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900">DevFlux</h1>
+        <div className="flex w-full max-w-md flex-col items-center gap-4">
+          <ErrorBanner message={`Impossible de charger votre profil. ${profileResource.errorMessage}`} />
+          <button
+            type="button"
+            onClick={profileResource.reload}
+            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          >
+            Réessayer
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  if (!profileResource.value.isOnboardingCompleted) {
+    return (
+      <OnboardingScreen
+        topics={profileResource.value.topics}
+        isSubmitting={isCompletingOnboarding}
+        errorMessage={actionErrorMessage}
+        onSubmit={completeOnboarding}
+      />
+    )
+  }
+
+  return <MainApplication />
 }

@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3'
 
-const MIGRATIONS: string[] = [
+export const MIGRATIONS: string[] = [
   `
   CREATE TABLE sources (
     id INTEGER PRIMARY KEY,
@@ -43,6 +43,27 @@ const MIGRATIONS: string[] = [
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+  `,
+  `
+  CREATE TABLE article_embeddings (
+    article_id INTEGER PRIMARY KEY REFERENCES articles(id) ON DELETE CASCADE,
+    model_id TEXT NOT NULL,
+    vector BLOB NOT NULL
+  );
+
+  CREATE TABLE topic_embeddings (
+    topic_id TEXT PRIMARY KEY,
+    model_id TEXT NOT NULL,
+    vector BLOB NOT NULL
+  );
+
+  CREATE TABLE topic_preferences (
+    topic_id TEXT PRIMARY KEY,
+    preference TEXT NOT NULL CHECK (preference IN ('followed', 'muted'))
+  );
+
+  ALTER TABLE articles ADD COLUMN digest_rank INTEGER;
+  ALTER TABLE articles ADD COLUMN is_exploration INTEGER NOT NULL DEFAULT 0;
   `
 ]
 

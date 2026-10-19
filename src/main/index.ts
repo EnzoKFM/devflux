@@ -9,8 +9,11 @@ import seedSources from './database/seedSources.json'
 import { parseHttpUrl } from './httpUrl'
 import { registerIpcHandlers } from './ipc'
 import { isNavigationAllowed } from './navigationPolicy'
+import { createElectronEmbeddingProvider } from './recommendation/electronEmbeddingProvider'
 
 const DATABASE_FILE_NAME = 'devflux.sqlite'
+const MODELS_DIRECTORY_NAME = 'models'
+const EMBEDDING_WORKER_FILE_NAME = 'embeddingWorker.js'
 
 let mainWindow: BrowserWindow | null = null
 let database: Database.Database | null = null
@@ -75,7 +78,12 @@ function startApplication(): void {
   })
   applyDefaultAutostart(database, autostartContext, startedAt)
 
-  registerIpcHandlers({ database, autostartContext })
+  const embeddingProvider = createElectronEmbeddingProvider(
+    join(__dirname, EMBEDDING_WORKER_FILE_NAME),
+    join(app.getPath('userData'), MODELS_DIRECTORY_NAME)
+  )
+
+  registerIpcHandlers({ database, autostartContext, embeddingProvider })
   mainWindow = createMainWindow()
 }
 

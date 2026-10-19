@@ -19,6 +19,7 @@ export interface DigestArticle {
   isReadLater: boolean
   rating: FeedbackRating | null
   feedbackReason: FeedbackReason | null
+  isExploration: boolean
 }
 
 export interface Source {
@@ -45,7 +46,7 @@ export interface DailyDigest {
   collectionReport: CollectionReport | null
 }
 
-export type PreparationStep = 'purging' | 'collecting' | 'building-digest' | 'done'
+export type PreparationStep = 'purging' | 'collecting' | 'downloading-model' | 'analyzing' | 'building-digest' | 'done'
 
 export interface PreparationProgress {
   step: PreparationStep
@@ -66,6 +67,34 @@ export interface AutostartStatus {
   isEnabled: boolean
 }
 
+export type TopicPreference = 'followed' | 'neutral' | 'muted'
+
+export type RecommendationMode = 'cold-start' | 'similarity' | 'trained' | 'unavailable'
+
+export interface ProfileTopic {
+  id: string
+  label: string
+  preference: TopicPreference
+  affinity: number | null
+}
+
+export interface SourceAffinity {
+  sourceKey: string
+  sourceName: string
+  likeCount: number
+  dislikeCount: number
+  affinity: number
+}
+
+export interface UserProfile {
+  isOnboardingCompleted: boolean
+  recommendationMode: RecommendationMode
+  likeCount: number
+  dislikeCount: number
+  topics: ProfileTopic[]
+  sourceAffinities: SourceAffinity[]
+}
+
 export interface DevFluxApi {
   prepareDailyDigest(): Promise<DailyDigest>
   onPreparationProgress(listener: (progress: PreparationProgress) => void): () => void
@@ -84,6 +113,9 @@ export interface DevFluxApi {
   removeSource(sourceId: number): Promise<void>
   getAutostartStatus(): Promise<AutostartStatus>
   setAutostartEnabled(isEnabled: boolean): Promise<AutostartStatus>
+  getUserProfile(): Promise<UserProfile>
+  completeOnboarding(followedTopicIds: string[]): Promise<UserProfile>
+  setTopicPreference(topicId: string, preference: TopicPreference): Promise<UserProfile>
 }
 
 export const IPC_CHANNELS = {
@@ -103,5 +135,8 @@ export const IPC_CHANNELS = {
   setSourceEnabled: 'sources:set-enabled',
   removeSource: 'sources:remove',
   getAutostartStatus: 'autostart:get-status',
-  setAutostartEnabled: 'autostart:set-enabled'
+  setAutostartEnabled: 'autostart:set-enabled',
+  getUserProfile: 'profile:get',
+  completeOnboarding: 'profile:complete-onboarding',
+  setTopicPreference: 'profile:set-topic-preference'
 } as const

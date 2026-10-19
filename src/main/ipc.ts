@@ -7,7 +7,8 @@ import {
   type DailyDigest,
   type DigestArticle,
   type PreparationProgress,
-  type Source
+  type Source,
+  type UserProfile
 } from '@shared/contract'
 import {
   getAutostartStatus,
@@ -21,8 +22,13 @@ import {
   parseHttpUrlArgument,
   parseIdentifier,
   parseRating,
-  parseReason
+  parseReason,
+  parseTopicId,
+  parseTopicIds,
+  parseTopicPreference
 } from './ipcValidation'
+import { completeOnboarding, getUserProfile, setTopicPreference } from './profile/profileService'
+import type { EmbeddingProvider } from './recommendation/embeddingProvider'
 import { extractArticleContent } from './reader/articleExtractor'
 import {
   findArticleById,
@@ -39,6 +45,7 @@ import { addSource, removeSource, setSourceEnabled } from './sources/sourceServi
 export interface IpcDependencies {
   database: Database.Database
   autostartContext: AutostartContext
+  embeddingProvider: EmbeddingProvider
 }
 
 function requireArticle(database: Database.Database, articleId: number): DigestArticle {
@@ -49,7 +56,7 @@ function requireArticle(database: Database.Database, articleId: number): DigestA
   return article
 }
 
-export function registerIpcHandlers({ database, autostartContext }: IpcDependencies): void {
+export function registerIpcHandlers({ database, autostartContext, embeddingProvider }: IpcDependencies): void {
   let pendingPreparation: Promise<DailyDigest> | null = null
 
   ipcMain.handle(IPC_CHANNELS.prepareDailyDigest, (event: IpcMainInvokeEvent): Promise<DailyDigest> => {
@@ -59,7 +66,7 @@ export function registerIpcHandlers({ database, autostartContext }: IpcDependenc
           event.sender.send(IPC_CHANNELS.preparationProgress, progress)
         }
       }
-      pendingPreparation = prepareDailyDigest(database, { onProgress: sendProgress }).finally(() => {
+      pendingPreparation = prepareDailyDigest(database, { embeddingProvider, onProgress: sendProgress }).finally(() => {
         pendingPreparation = null
       })
     }
@@ -145,5 +152,29 @@ export function registerIpcHandlers({ database, autostartContext }: IpcDependenc
     IPC_CHANNELS.setAutostartEnabled,
     (_event, isEnabledArgument: unknown): AutostartStatus =>
       setAutostartEnabled(autostartContext, parseBoolean(isEnabledArgument, 'isEnabled'))
+  )
+
+  ipcMain.handle(IPC_CHANNELS.getUserProfile, (): UserProfile => getUserProfile(database, embeddingProvider))
+
+  ipcMain.handle(
+    IPC_CHANNELS.completeOnboarding,
+    (_event, followedTopicIdsArgument: unknown): UserProfile =>
+      completeOnboarding(
+        database,
+        parseTopicIds(followedTopicIdsArgument, 'followedTopicIds'),
+        new Date().toISOString(),
+        embeddingProvider
+      )
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.setTopicPreference,
+    (_event, topicIdArgument: unknown, preferenceArgument: unknown): UserProfile =>
+      setTopicPreference(
+        database,
+        parseTopicId(topicIdArgument, 'topicId'),
+        parseTopicPreference(preferenceArgument),
+        embeddingProvider
+      )
   )
 }

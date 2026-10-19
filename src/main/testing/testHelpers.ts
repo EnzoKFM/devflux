@@ -1,8 +1,9 @@
 import Database from 'better-sqlite3'
 import type { FeedData, FeedEntry } from '@extractus/feed-extractor'
-import type { SourceCategory } from '@shared/contract'
+import type { FeedbackReason, SourceCategory } from '@shared/contract'
 import { applyMigrations } from '../database/migrations'
 import type { FeedFetcher } from '../collector/feedFetcher'
+import type { EmbedOptions, EmbeddingProvider } from '../recommendation/embeddingProvider'
 import { insertSource } from '../repositories/sourceRepository'
 
 export const FIXED_NOW = new Date('2026-10-19T09:30:00.000Z')
@@ -59,11 +60,13 @@ export function insertTestArticle(
   options: {
     sourceId: number
     slug: string
+    title?: string
     publishedAt: string
     digestDate?: string | null
     isFavorite?: boolean
     isReadLater?: boolean
     rating?: 'like' | 'dislike'
+    reason?: FeedbackReason
   }
 ): number {
   const insertResult = database
@@ -74,7 +77,7 @@ export function insertTestArticle(
     .run(
       options.sourceId,
       `https://blog.example.com/${options.slug}`,
-      `Article ${options.slug}`,
+      options.title ?? `Article ${options.slug}`,
       options.publishedAt,
       FIXED_NOW.toISOString(),
       options.digestDate ?? null,
@@ -84,8 +87,52 @@ export function insertTestArticle(
   const articleId = Number(insertResult.lastInsertRowid)
   if (options.rating) {
     database
-      .prepare('INSERT INTO feedback (article_id, rating, reason, created_at) VALUES (?, ?, NULL, ?)')
-      .run(articleId, options.rating, FIXED_NOW.toISOString())
+      .prepare('INSERT INTO feedback (article_id, rating, reason, created_at) VALUES (?, ?, ?, ?)')
+      .run(articleId, options.rating, options.reason ?? null, FIXED_NOW.toISOString())
   }
   return articleId
+}
+
+const VARIANT_DIMENSION_COUNT = 64
+
+export interface FakeEmbeddingProvider extends EmbeddingProvider {
+  embeddedTexts: string[]
+  embedCallCount: number
+}
+
+export function createKeywordEmbeddingProvider(
+  axisKeywords: string[],
+  options: { isModelDownloadRequired?: boolean; failure?: Error; modelId?: string } = {}
+): FakeEmbeddingProvider {
+  const embedText = (text: string): Float32Array => {
+    const normalizedText = text.toLowerCase()
+    const vector = new Float32Array(axisKeywords.length + VARIANT_DIMENSION_COUNT)
+    axisKeywords.forEach((axisKeyword, axisIndex) => {
+      vector[axisIndex] = normalizedText.includes(axisKeyword) ? 1 : 0
+    })
+    const trailingNumber = /(\d+)\s*$/.exec(text)
+    if (trailingNumber) {
+      vector[axisKeywords.length + (Number(trailingNumber[1]) % VARIANT_DIMENSION_COUNT)] = 1
+    }
+    return vector
+  }
+
+  const embeddingProvider: FakeEmbeddingProvider = {
+    modelId: options.modelId ?? 'modele-factice',
+    embeddedTexts: [],
+    embedCallCount: 0,
+    isModelDownloadRequired: () => options.isModelDownloadRequired ?? false,
+    async embed(texts: string[], embedOptions?: EmbedOptions): Promise<Float32Array[]> {
+      embeddingProvider.embedCallCount += 1
+      if (options.isModelDownloadRequired) {
+        embedOptions?.onModelReady?.()
+      }
+      if (options.failure) {
+        throw options.failure
+      }
+      embeddingProvider.embeddedTexts.push(...texts)
+      return texts.map(embedText)
+    }
+  }
+  return embeddingProvider
 }

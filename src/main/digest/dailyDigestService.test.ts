@@ -4,18 +4,16 @@ import {
   addTestSource,
   buildEntry,
   createFeedFetcher,
+  createKeywordEmbeddingProvider,
   createTestDatabase,
   daysBefore,
   FIXED_NOW,
   insertTestArticle
 } from '../testing/testHelpers'
+import { getUserProfile } from '../profile/profileService'
 import { listFavoriteArticles, listReadLaterArticles } from '../repositories/articleRepository'
-import {
-  formatLocalDate,
-  MAX_DIGEST_ARTICLES_PER_SOURCE,
-  prepareDailyDigest,
-  purgeExpiredArticles
-} from './dailyDigestService'
+import { MAX_DIGEST_ARTICLES_PER_SOURCE } from '../recommendation/selection'
+import { formatLocalDate, prepareDailyDigest, purgeExpiredArticles } from './dailyDigestService'
 
 describe('formatLocalDate', () => {
   it('formate la date en heure locale', () => {
@@ -239,5 +237,293 @@ describe('intégration collecte et fil', () => {
       purgedArticleCount: 0
     })
     expect(digest.articles).toHaveLength(1)
+  })
+})
+
+describe('recommandation locale dans le fil', () => {
+  const emptyFeedFetcher = async () => ({ entries: [] })
+  const RATED_ARTICLE_VARIANT_OFFSET = 40
+
+  function listDistinctSteps(progressSteps: PreparationProgress[]): string[] {
+    return progressSteps
+      .map((progress) => progress.step)
+      .filter((step, stepIndex, steps) => step !== steps[stepIndex - 1])
+  }
+
+  function seedTopicArticles(
+    database: ReturnType<typeof createTestDatabase>,
+    topicKeyword: string,
+    articleCount: number,
+    ageInDays: number
+  ): void {
+    for (let articleNumber = 1; articleNumber <= articleCount; articleNumber += 1) {
+      const sourceId = addTestSource(database, `Blog ${topicKeyword} ${articleNumber}`)
+      insertTestArticle(database, {
+        sourceId,
+        slug: `${topicKeyword}-${articleNumber}`,
+        publishedAt: daysBefore(FIXED_NOW, ageInDays + articleNumber * 0.001)
+      })
+    }
+  }
+
+  function rateTopicArticles(
+    database: ReturnType<typeof createTestDatabase>,
+    topicKeyword: string,
+    rating: 'like' | 'dislike',
+    articleCount: number
+  ): void {
+    const sourceId = addTestSource(database, `Blog noté ${topicKeyword}`)
+    for (let articleNumber = 1; articleNumber <= articleCount; articleNumber += 1) {
+      insertTestArticle(database, {
+        sourceId,
+        slug: `note-${topicKeyword}-${RATED_ARTICLE_VARIANT_OFFSET + articleNumber}`,
+        publishedAt: daysBefore(FIXED_NOW, 3),
+        rating,
+        reason: rating === 'dislike' ? 'off-topic' : undefined
+      })
+    }
+  }
+
+  it('n appelle jamais le fournisseur d embeddings en démarrage à froid', async () => {
+    const database = createTestDatabase()
+    seedTopicArticles(database, 'rust', 3, 1)
+    const embeddingProvider = createKeywordEmbeddingProvider(['rust'])
+    const progressSteps: PreparationProgress[] = []
+
+    const digest = await prepareDailyDigest(database, {
+      fetchFeed: emptyFeedFetcher,
+      now: () => FIXED_NOW,
+      embeddingProvider,
+      onProgress: (progress) => progressSteps.push(progress)
+    })
+
+    expect(embeddingProvider.embedCallCount).toBe(0)
+    expect(digest.articles).toHaveLength(3)
+    expect(digest.articles.every((article) => !article.isExploration)).toBe(true)
+    expect(progressSteps.map((progress) => progress.step)).not.toContain('analyzing')
+    expect(database.prepare('SELECT COUNT(*) AS rankedCount FROM articles WHERE digest_rank IS NOT NULL').get()).toEqual({
+      rankedCount: 0
+    })
+  })
+
+  it('remonte les articles proches des 👍 et réserve deux places à l exploration', async () => {
+    const database = createTestDatabase()
+    rateTopicArticles(database, 'rust', 'like', 1)
+    seedTopicArticles(database, 'python', 15, 1)
+    seedTopicArticles(database, 'rust', 15, 5)
+    const embeddingProvider = createKeywordEmbeddingProvider(['rust', 'python'])
+
+    const digest = await prepareDailyDigest(database, {
+      fetchFeed: emptyFeedFetcher,
+      now: () => FIXED_NOW,
+      embeddingProvider,
+      random: () => 0
+    })
+
+    expect(digest.articles).toHaveLength(DAILY_DIGEST_SIZE)
+    const rustPositions = digest.articles
+      .map((article, articlePosition) => (article.url.includes('/rust-') ? articlePosition : -1))
+      .filter((articlePosition) => articlePosition >= 0)
+    expect(rustPositions.slice(0, 6)).toEqual([0, 1, 2, 3, 4, 5])
+    const explorationPositions = digest.articles
+      .map((article, articlePosition) => (article.isExploration ? articlePosition : -1))
+      .filter((articlePosition) => articlePosition >= 0)
+    expect(explorationPositions).toEqual([6, 13])
+    expect(getUserProfile(database).recommendationMode).toBe('similarity')
+  })
+
+  it('privilégie les sujets suivis à l intégration', async () => {
+    const database = createTestDatabase()
+    database.prepare("INSERT INTO topic_preferences (topic_id, preference) VALUES ('python', 'followed')").run()
+    seedTopicArticles(database, 'rust', 6, 1)
+    seedTopicArticles(database, 'python', 6, 4)
+    const embeddingProvider = createKeywordEmbeddingProvider(['rust', 'python'])
+
+    const digest = await prepareDailyDigest(database, {
+      fetchFeed: emptyFeedFetcher,
+      now: () => FIXED_NOW,
+      embeddingProvider,
+      random: () => 0
+    })
+
+    expect(digest.articles.slice(0, 3).every((article) => article.url.includes('/python-'))).toBe(true)
+  })
+
+  it('fait passer un article en français devant un article anglais de pertinence égale', async () => {
+    const database = createTestDatabase()
+    database.prepare("INSERT INTO topic_preferences (topic_id, preference) VALUES ('python', 'followed')").run()
+    insertTestArticle(database, {
+      sourceId: addTestSource(database, 'Blog anglais'),
+      slug: 'python-anglais',
+      title: 'What is new in the Python release for your team 1',
+      publishedAt: daysBefore(FIXED_NOW, 1)
+    })
+    insertTestArticle(database, {
+      sourceId: addTestSource(database, 'Blog français'),
+      slug: 'python-francais',
+      title: 'Les nouveautés de Python pour les développeurs 2',
+      publishedAt: daysBefore(FIXED_NOW, 2)
+    })
+    const embeddingProvider = createKeywordEmbeddingProvider(['python'])
+
+    const digest = await prepareDailyDigest(database, {
+      fetchFeed: emptyFeedFetcher,
+      now: () => FIXED_NOW,
+      embeddingProvider,
+      random: () => 0
+    })
+
+    expect(digest.articles.map((article) => article.url.split('/').at(-1))).toEqual(['python-francais', 'python-anglais'])
+  })
+
+  it('passe en apprentissage supervisé avec assez de 👍 et de 👎', async () => {
+    const database = createTestDatabase()
+    rateTopicArticles(database, 'rust', 'like', 12)
+    rateTopicArticles(database, 'python', 'dislike', 12)
+    seedTopicArticles(database, 'python', 6, 1)
+    seedTopicArticles(database, 'rust', 6, 8)
+    const embeddingProvider = createKeywordEmbeddingProvider(['rust', 'python'])
+
+    const digest = await prepareDailyDigest(database, {
+      fetchFeed: emptyFeedFetcher,
+      now: () => FIXED_NOW,
+      embeddingProvider,
+      random: () => 0
+    })
+
+    expect(getUserProfile(database).recommendationMode).toBe('trained')
+    expect(digest.articles.slice(0, 6).every((article) => article.url.includes('/rust-'))).toBe(true)
+  })
+
+  it('publie le téléchargement du modèle jusqu à ce que le fournisseur signale le modèle prêt', async () => {
+    const database = createTestDatabase()
+    rateTopicArticles(database, 'rust', 'like', 1)
+    seedTopicArticles(database, 'rust', 2, 1)
+    const progressSteps: PreparationProgress[] = []
+    const embeddingProvider = createKeywordEmbeddingProvider(['rust'], { isModelDownloadRequired: true })
+    const embedWithModelReady = embeddingProvider.embed
+    let stepPublishedWhenEmbeddingStarted: PreparationProgress['step'] | undefined
+    embeddingProvider.embed = (texts, embedOptions) => {
+      stepPublishedWhenEmbeddingStarted = progressSteps.at(-1)?.step
+      return embedWithModelReady(texts, embedOptions)
+    }
+
+    await prepareDailyDigest(database, {
+      fetchFeed: emptyFeedFetcher,
+      now: () => FIXED_NOW,
+      embeddingProvider,
+      onProgress: (progress) => progressSteps.push(progress)
+    })
+
+    expect(stepPublishedWhenEmbeddingStarted).toBe('downloading-model')
+    expect(listDistinctSteps(progressSteps)).toEqual([
+      'purging',
+      'collecting',
+      'downloading-model',
+      'analyzing',
+      'building-digest',
+      'done'
+    ])
+  })
+
+  it('ne publie pas le téléchargement quand le modèle est déjà en cache', async () => {
+    const database = createTestDatabase()
+    rateTopicArticles(database, 'rust', 'like', 1)
+    seedTopicArticles(database, 'rust', 2, 1)
+    const progressSteps: PreparationProgress[] = []
+
+    await prepareDailyDigest(database, {
+      fetchFeed: emptyFeedFetcher,
+      now: () => FIXED_NOW,
+      embeddingProvider: createKeywordEmbeddingProvider(['rust']),
+      onProgress: (progress) => progressSteps.push(progress)
+    })
+
+    expect(listDistinctSteps(progressSteps)).toEqual([
+      'purging',
+      'collecting',
+      'analyzing',
+      'building-digest',
+      'done'
+    ])
+  })
+
+  it('retombe sur le tourniquet sans lever d erreur quand le fournisseur échoue', async () => {
+    const database = createTestDatabase()
+    rateTopicArticles(database, 'rust', 'like', 1)
+    seedTopicArticles(database, 'rust', 3, 5)
+    seedTopicArticles(database, 'python', 3, 1)
+    const embeddingProvider = createKeywordEmbeddingProvider(['rust'], { failure: new Error('modèle indisponible') })
+
+    const digest = await prepareDailyDigest(database, {
+      fetchFeed: emptyFeedFetcher,
+      now: () => FIXED_NOW,
+      embeddingProvider
+    })
+
+    expect(embeddingProvider.embedCallCount).toBe(1)
+    expect(digest.articles.map((article) => article.url.split('/').at(-1)?.split('-')[0])).toEqual([
+      'python',
+      'python',
+      'python',
+      'rust',
+      'rust',
+      'rust'
+    ])
+    expect(digest.articles.every((article) => !article.isExploration)).toBe(true)
+    expect(getUserProfile(database).recommendationMode).toBe('unavailable')
+  })
+
+  it('retombe sur le tourniquet quand aucun fournisseur n est fourni alors qu un profil existe', async () => {
+    const database = createTestDatabase()
+    rateTopicArticles(database, 'rust', 'like', 1)
+    seedTopicArticles(database, 'rust', 2, 1)
+
+    const digest = await prepareDailyDigest(database, { fetchFeed: emptyFeedFetcher, now: () => FIXED_NOW })
+
+    expect(digest.articles).toHaveLength(2)
+    expect(getUserProfile(database).recommendationMode).toBe('unavailable')
+  })
+
+  it('retrouve le mode similarité au fil suivant quand le fournisseur refonctionne', async () => {
+    const database = createTestDatabase()
+    rateTopicArticles(database, 'rust', 'like', 1)
+    seedTopicArticles(database, 'rust', 2, 1)
+    const nextDay = new Date(FIXED_NOW.getTime() + 24 * 60 * 60 * 1000)
+
+    await prepareDailyDigest(database, { fetchFeed: emptyFeedFetcher, now: () => FIXED_NOW })
+    await prepareDailyDigest(database, {
+      fetchFeed: emptyFeedFetcher,
+      now: () => nextDay,
+      embeddingProvider: createKeywordEmbeddingProvider(['rust'])
+    })
+
+    expect(getUserProfile(database).recommendationMode).toBe('similarity')
+  })
+
+  it('calcule chaque embedding une seule fois et ne relance pas le modèle sans nouveauté', async () => {
+    const database = createTestDatabase()
+    rateTopicArticles(database, 'rust', 'like', 1)
+    seedTopicArticles(database, 'rust', 2, 1)
+    const embeddingProvider = createKeywordEmbeddingProvider(['rust'])
+    const nextDay = new Date(FIXED_NOW.getTime() + 24 * 60 * 60 * 1000)
+
+    await prepareDailyDigest(database, { fetchFeed: emptyFeedFetcher, now: () => FIXED_NOW, embeddingProvider })
+    const embeddedTextCountAfterFirstDigest = embeddingProvider.embeddedTexts.length
+    await prepareDailyDigest(database, { fetchFeed: emptyFeedFetcher, now: () => nextDay, embeddingProvider })
+
+    expect(embeddingProvider.embedCallCount).toBe(1)
+    expect(embeddingProvider.embeddedTexts).toHaveLength(embeddedTextCountAfterFirstDigest)
+    expect(new Set(embeddingProvider.embeddedTexts).size).toBe(embeddingProvider.embeddedTexts.length)
+  })
+
+  it('calcule aussi l embedding des articles notés pour construire le profil', async () => {
+    const database = createTestDatabase()
+    rateTopicArticles(database, 'rust', 'like', 1)
+    const embeddingProvider = createKeywordEmbeddingProvider(['rust'])
+
+    await prepareDailyDigest(database, { fetchFeed: emptyFeedFetcher, now: () => FIXED_NOW, embeddingProvider })
+
+    expect(embeddingProvider.embeddedTexts).toContain(`Article note-rust-${RATED_ARTICLE_VARIANT_OFFSET + 1}`)
   })
 })

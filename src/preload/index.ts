@@ -23,7 +23,10 @@ const devFluxApi: DevFluxApi = {
   setSourceEnabled: (sourceId, isEnabled) => ipcRenderer.invoke(IPC_CHANNELS.setSourceEnabled, sourceId, isEnabled),
   removeSource: (sourceId) => ipcRenderer.invoke(IPC_CHANNELS.removeSource, sourceId),
   getAutostartStatus: () => ipcRenderer.invoke(IPC_CHANNELS.getAutostartStatus),
-  setAutostartEnabled: (isEnabled) => ipcRenderer.invoke(IPC_CHANNELS.setAutostartEnabled, isEnabled)
+  setAutostartEnabled: (isEnabled) => ipcRenderer.invoke(IPC_CHANNELS.setAutostartEnabled, isEnabled),
+  getUserProfile: () => ipcRenderer.invoke(IPC_CHANNELS.getUserProfile),
+  completeOnboarding: (followedTopicIds) => ipcRenderer.invoke(IPC_CHANNELS.completeOnboarding, followedTopicIds),
+  setTopicPreference: (topicId, preference) => ipcRenderer.invoke(IPC_CHANNELS.setTopicPreference, topicId, preference)
 }
 
 contextBridge.exposeInMainWorld('devflux', devFluxApi)

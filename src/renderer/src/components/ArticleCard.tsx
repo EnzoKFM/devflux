@@ -2,6 +2,7 @@ import type { DigestArticle } from '@shared/contract'
 import type { ArticleActionHandlers } from '@renderer/hooks/useArticleActions'
 import { formatAbsoluteDate, formatRelativeDate } from '@renderer/lib/formatDate'
 import { ArticleActions } from './ArticleActions'
+import { ExplorationBadge } from './ExplorationBadge'
 
 interface ArticleCardProps {
   article: DigestArticle
@@ -43,6 +44,7 @@ export function ArticleCard({ article, isSelected, actions, onSelect }: ArticleC
           <time dateTime={article.publishedAt} title={formatAbsoluteDate(article.publishedAt)}>
             {formatRelativeDate(article.publishedAt)}
           </time>
+          {article.isExploration && <ExplorationBadge />}
         </span>
         {article.summary && (
           <span className="mt-1.5 ml-4 line-clamp-3 block text-sm leading-relaxed text-slate-600">

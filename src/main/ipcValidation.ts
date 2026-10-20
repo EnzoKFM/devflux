@@ -1,4 +1,5 @@
 import {
+  SEARCH_QUERY_MAX_LENGTH,
   THEME_PREFERENCES,
   type FeedbackRating,
   type FeedbackReason,
@@ -8,11 +9,11 @@ import {
 } from '@shared/contract'
 import { parseHttpUrl } from './httpUrl'
 import { isTopicId, TOPIC_CATALOG } from './profile/topicCatalog'
+import { isSourceCategory, SOURCE_CATEGORIES } from './sources/sourceCategory'
 import { isThemePreference } from './theme'
 
 const FEEDBACK_RATINGS: readonly FeedbackRating[] = ['like', 'dislike']
 const FEEDBACK_REASONS: readonly FeedbackReason[] = ['off-topic', 'too-basic', 'already-seen', 'bad-source']
-const SOURCE_CATEGORIES: readonly SourceCategory[] = ['web', 'software', 'general']
 const TOPIC_PREFERENCES: readonly TopicPreference[] = ['followed', 'neutral', 'muted']
 
 export function parseIdentifier(value: unknown, argumentName: string): number {
@@ -47,10 +48,17 @@ export function parseReason(value: unknown): FeedbackReason | null {
 }
 
 export function parseCategory(value: unknown): SourceCategory {
-  if (typeof value !== 'string' || !(SOURCE_CATEGORIES as readonly string[]).includes(value)) {
+  if (!isSourceCategory(value)) {
     throw new Error(`Argument invalide : category doit être l'une des valeurs ${SOURCE_CATEGORIES.join(', ')}.`)
   }
-  return value as SourceCategory
+  return value
+}
+
+export function parseSearchQuery(value: unknown): string {
+  if (typeof value !== 'string' || value.length > SEARCH_QUERY_MAX_LENGTH) {
+    throw new Error(`Argument invalide : query doit être une chaîne d'au plus ${SEARCH_QUERY_MAX_LENGTH} caractères.`)
+  }
+  return value
 }
 
 export function parseHttpUrlArgument(value: unknown, argumentName: string): string {

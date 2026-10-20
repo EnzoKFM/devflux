@@ -1,4 +1,5 @@
-import { ipcMain, nativeTheme, shell, type IpcMainInvokeEvent } from 'electron'
+import { writeFileSync } from 'node:fs'
+import { BrowserWindow, dialog, ipcMain, nativeTheme, Notification, shell, type IpcMainInvokeEvent } from 'electron'
 import type Database from 'better-sqlite3'
 import {
   IPC_CHANNELS,
@@ -9,6 +10,7 @@ import {
   type PreparationProgress,
   type ThemePreference,
   type Source,
+  type SourcesImportReport,
   type UserProfile
 } from '@shared/contract'
 import {
@@ -17,6 +19,8 @@ import {
   type AutostartContext
 } from './autostart'
 import { prepareDailyDigest } from './digest/dailyDigestService'
+import { buildDigestReadyNotification } from './digest/digestNotification'
+import { buildFavoritesMarkdown } from './exports/favoritesMarkdown'
 import {
   parseBoolean,
   parseCategory,
@@ -24,6 +28,7 @@ import {
   parseIdentifier,
   parseRating,
   parseReason,
+  parseSearchQuery,
   parseTopicId,
   parseTopicIds,
   parseThemePreference,
@@ -31,18 +36,20 @@ import {
 } from './ipcValidation'
 import { completeOnboarding, getUserProfile, setTopicPreference } from './profile/profileService'
 import type { EmbeddingProvider } from './recommendation/embeddingProvider'
-import { extractArticleContent } from './reader/articleExtractor'
+import { loadArticleContent } from './reader/readerService'
 import {
-  findArticleById,
   listFavoriteArticles,
   listReadLaterArticles,
   markArticleAsRead,
+  requireArticle,
+  searchArticles,
   setArticleFavorite,
   setArticleReadLater
 } from './repositories/articleRepository'
 import { deleteFeedback, saveFeedback } from './repositories/feedbackRepository'
 import { listSources } from './repositories/sourceRepository'
-import { addSource, removeSource, setSourceEnabled } from './sources/sourceService'
+import { buildSourcesOpml, parseSourcesOpml, readOpmlFile } from './sources/opml'
+import { addSource, importSources, removeSource, setSourceEnabled } from './sources/sourceService'
 import { readThemePreference, saveThemePreference } from './theme'
 
 export interface IpcDependencies {
@@ -51,12 +58,46 @@ export interface IpcDependencies {
   embeddingProvider: EmbeddingProvider
 }
 
-function requireArticle(database: Database.Database, articleId: number): DigestArticle {
-  const article = findArticleById(database, articleId)
-  if (!article) {
-    throw new Error(`Article introuvable (id ${articleId}).`)
+function showDigestReadyNotification(dailyDigest: DailyDigest, digestWindow: BrowserWindow | null): void {
+  const digestReadyNotification = buildDigestReadyNotification(dailyDigest)
+  if (!digestReadyNotification || !Notification.isSupported() || digestWindow?.isFocused()) {
+    return
   }
-  return article
+  try {
+    const systemNotification = new Notification(digestReadyNotification)
+    systemNotification.on('click', () => {
+      if (digestWindow && !digestWindow.isDestroyed()) {
+        digestWindow.show()
+        digestWindow.focus()
+      }
+    })
+    systemNotification.show()
+  } catch (error) {
+    console.error('Notification du fil du jour impossible', error)
+  }
+}
+
+async function saveTextFile(
+  event: IpcMainInvokeEvent,
+  dialogTitle: string,
+  defaultFileName: string,
+  fileFilter: Electron.FileFilter,
+  buildContent: () => string
+): Promise<boolean> {
+  const saveDialogOptions: Electron.SaveDialogOptions = {
+    title: dialogTitle,
+    defaultPath: defaultFileName,
+    filters: [fileFilter]
+  }
+  const parentWindow = BrowserWindow.fromWebContents(event.sender)
+  const saveDialogResult = parentWindow
+    ? await dialog.showSaveDialog(parentWindow, saveDialogOptions)
+    : await dialog.showSaveDialog(saveDialogOptions)
+  if (saveDialogResult.canceled || !saveDialogResult.filePath) {
+    return false
+  }
+  writeFileSync(saveDialogResult.filePath, buildContent(), 'utf8')
+  return true
 }
 
 export function registerIpcHandlers({ database, autostartContext, embeddingProvider }: IpcDependencies): void {
@@ -69,9 +110,15 @@ export function registerIpcHandlers({ database, autostartContext, embeddingProvi
           event.sender.send(IPC_CHANNELS.preparationProgress, progress)
         }
       }
-      pendingPreparation = prepareDailyDigest(database, { embeddingProvider, onProgress: sendProgress }).finally(() => {
-        pendingPreparation = null
-      })
+      const digestWindow = BrowserWindow.fromWebContents(event.sender)
+      pendingPreparation = prepareDailyDigest(database, { embeddingProvider, onProgress: sendProgress })
+        .then((dailyDigest) => {
+          showDigestReadyNotification(dailyDigest, digestWindow)
+          return dailyDigest
+        })
+        .finally(() => {
+          pendingPreparation = null
+        })
     }
     return pendingPreparation
   })
@@ -81,10 +128,26 @@ export function registerIpcHandlers({ database, autostartContext, embeddingProvi
   ipcMain.handle(IPC_CHANNELS.listFavoriteArticles, (): DigestArticle[] => listFavoriteArticles(database))
 
   ipcMain.handle(
+    IPC_CHANNELS.searchArticles,
+    (_event, queryArgument: unknown): DigestArticle[] => searchArticles(database, parseSearchQuery(queryArgument))
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.exportFavoritesMarkdown,
+    (event: IpcMainInvokeEvent): Promise<boolean> =>
+      saveTextFile(
+        event,
+        'Exporter les favoris',
+        'favoris-devflux.md',
+        { name: 'Markdown', extensions: ['md'] },
+        () => buildFavoritesMarkdown(listFavoriteArticles(database))
+      )
+  )
+
+  ipcMain.handle(
     IPC_CHANNELS.getArticleContent,
     (_event, articleIdArgument: unknown): Promise<ArticleContent> => {
-      const article = requireArticle(database, parseIdentifier(articleIdArgument, 'articleId'))
-      return extractArticleContent({ articleId: article.id, title: article.title, url: article.url })
+      return loadArticleContent(database, parseIdentifier(articleIdArgument, 'articleId'))
     }
   )
 
@@ -148,6 +211,42 @@ export function registerIpcHandlers({ database, autostartContext, embeddingProvi
   ipcMain.handle(IPC_CHANNELS.removeSource, (_event, sourceIdArgument: unknown): void => {
     removeSource(database, parseIdentifier(sourceIdArgument, 'sourceId'))
   })
+
+  ipcMain.handle(
+    IPC_CHANNELS.exportSourcesOpml,
+    (event: IpcMainInvokeEvent): Promise<boolean> =>
+      saveTextFile(
+        event,
+        'Exporter les sources',
+        'sources-devflux.opml',
+        { name: 'OPML', extensions: ['opml', 'xml'] },
+        () => buildSourcesOpml(listSources(database))
+      )
+  )
+
+  ipcMain.handle(
+    IPC_CHANNELS.importSourcesOpml,
+    async (event: IpcMainInvokeEvent): Promise<SourcesImportReport | null> => {
+      const openDialogOptions: Electron.OpenDialogOptions = {
+        title: 'Importer des sources',
+        properties: ['openFile'],
+        filters: [{ name: 'OPML', extensions: ['opml', 'xml'] }]
+      }
+      const parentWindow = BrowserWindow.fromWebContents(event.sender)
+      const openDialogResult = parentWindow
+        ? await dialog.showOpenDialog(parentWindow, openDialogOptions)
+        : await dialog.showOpenDialog(openDialogOptions)
+      const [opmlFilePath] = openDialogResult.filePaths
+      if (openDialogResult.canceled || !opmlFilePath) {
+        return null
+      }
+      const parsedSourcesOpml = parseSourcesOpml(readOpmlFile(opmlFilePath))
+      return {
+        ...importSources(database, parsedSourcesOpml.newSources, new Date().toISOString()),
+        rejectedCount: parsedSourcesOpml.rejectedFeedCount
+      }
+    }
+  )
 
   ipcMain.handle(IPC_CHANNELS.getAutostartStatus, (): AutostartStatus => getAutostartStatus(autostartContext))
 

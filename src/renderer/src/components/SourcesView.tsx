@@ -1,10 +1,42 @@
 import { useSources } from '@renderer/hooks/useSources'
+import { pluralize } from '@renderer/lib/pluralize'
+import { resolveSourceHealth } from '@renderer/lib/sourceHealth'
 import { AddSourceForm } from './AddSourceForm'
 import { ErrorBanner } from './ErrorBanner'
 import { SourceItem } from './SourceItem'
 
 export function SourcesView() {
-  const { sourcesResource, actionErrorMessage, toggleSourceEnabled, removeSource, addSource } = useSources()
+  const {
+    sourcesResource,
+    actionErrorMessage,
+    transferMessage,
+    isTransferring,
+    toggleSourceEnabled,
+    removeSource,
+    addSource,
+    importSourcesOpml,
+    exportSourcesOpml
+  } = useSources()
+
+  const renderHealthSummary = () => {
+    if (sourcesResource.status !== 'success') {
+      return null
+    }
+    const now = new Date()
+    const sourceStatuses = sourcesResource.value.map((source) => resolveSourceHealth(source, now).status)
+    const failingSourceCount = sourceStatuses.filter((sourceStatus) => sourceStatus === 'failing').length
+    const silentSourceCount = sourceStatuses.filter((sourceStatus) => sourceStatus === 'silent').length
+    const summaryParts = [
+      failingSourceCount > 0 ? pluralize(failingSourceCount, 'source en erreur', 'sources en erreur') : null,
+      silentSourceCount > 0 ? pluralize(silentSourceCount, 'source muette', 'sources muettes') : null
+    ].filter((summaryPart) => summaryPart !== null)
+    if (summaryParts.length === 0) {
+      return null
+    }
+    return (
+      <p className="text-sm font-medium text-amber-800 dark:text-amber-200">{summaryParts.join(' · ')}</p>
+    )
+  }
 
   const renderSources = () => {
     if (sourcesResource.status === 'loading') {
@@ -46,9 +78,35 @@ export function SourcesView() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto flex max-w-3xl flex-col gap-5 px-6 py-6">
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Sources</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Sources</h1>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={isTransferring}
+              onClick={importSourcesOpml}
+              className="rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-60"
+            >
+              Importer OPML
+            </button>
+            <button
+              type="button"
+              disabled={isTransferring}
+              onClick={exportSourcesOpml}
+              className="rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-60"
+            >
+              Exporter OPML
+            </button>
+          </div>
+        </div>
         <AddSourceForm onAddSource={addSource} />
         {actionErrorMessage && <ErrorBanner message={actionErrorMessage} />}
+        {transferMessage && (
+          <p role="status" className="text-sm text-slate-700 dark:text-slate-300">
+            {transferMessage}
+          </p>
+        )}
+        {renderHealthSummary()}
         {renderSources()}
       </div>
     </div>

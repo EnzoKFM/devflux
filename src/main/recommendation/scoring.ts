@@ -1,4 +1,5 @@
 import { ARTICLE_MAX_AGE_IN_DAYS } from '@shared/contract'
+import { MILLISECONDS_PER_DAY } from '@shared/time'
 import type { RatedArticle } from '../repositories/feedbackRepository'
 import type { StoredTopicPreference } from '../repositories/topicPreferenceRepository'
 import type { TrainingSample } from './logisticRegression'
@@ -9,8 +10,6 @@ export const SOURCE_AFFINITY_PRIOR_STRENGTH = 2
 export const NEGATIVE_SIMILARITY_WEIGHT = 0.5
 export const SOURCE_AFFINITY_WEIGHT = 0.15
 export const FRESHNESS_WEIGHT = 0.05
-
-const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000
 
 export interface SourceVoteCounts {
   likeCount: number
@@ -178,12 +177,19 @@ export function computeCandidateFeatures(
   return computeFeatures(relevanceProfile, scoredArticle, referenceTime, null)
 }
 
-export function computeSimilarityScore(relevanceFeatures: RelevanceFeatures): number {
-  return (
-    relevanceFeatures.positiveSimilarity -
-    NEGATIVE_SIMILARITY_WEIGHT * relevanceFeatures.negativeSimilarity +
-    SOURCE_AFFINITY_WEIGHT * relevanceFeatures.sourceAffinity +
+export function computeSimilarityContributions(relevanceFeatures: RelevanceFeatures): number[] {
+  return [
+    relevanceFeatures.positiveSimilarity,
+    -NEGATIVE_SIMILARITY_WEIGHT * relevanceFeatures.negativeSimilarity,
+    SOURCE_AFFINITY_WEIGHT * relevanceFeatures.sourceAffinity,
     FRESHNESS_WEIGHT * relevanceFeatures.freshness
+  ]
+}
+
+export function computeSimilarityScore(relevanceFeatures: RelevanceFeatures): number {
+  return computeSimilarityContributions(relevanceFeatures).reduce(
+    (similarityScore, featureContribution) => similarityScore + featureContribution,
+    0
   )
 }
 

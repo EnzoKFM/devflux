@@ -5,6 +5,7 @@ import { NavigationBar } from './components/NavigationBar'
 import { OnboardingScreen } from './components/OnboardingScreen'
 import { PreparationScreen } from './components/PreparationScreen'
 import { ProfileView } from './components/ProfileView'
+import { SearchView } from './components/SearchView'
 import { SettingsView } from './components/SettingsView'
 import { SourcesView } from './components/SourcesView'
 import { TodayView } from './components/TodayView'
@@ -48,6 +49,8 @@ function MainApplication() {
             applyArticlePatch={applyArticlePatch}
           />
         )
+      case 'search':
+        return <SearchView patchedArticlesOf={applyPatchesToArticles} applyArticlePatch={applyArticlePatch} />
       case 'profile':
         return <ProfileView />
       case 'sources':

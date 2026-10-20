@@ -22,6 +22,12 @@ function standardize(features: number[], featureMeans: number[], featureScales: 
   return features.map((feature, featureIndex) => (feature - featureMeans[featureIndex]) / featureScales[featureIndex])
 }
 
+export function computeFeatureContributions(model: LogisticRegressionModel, features: number[]): number[] {
+  return standardize(features, model.featureMeans, model.featureScales).map(
+    (standardizedFeature, featureIndex) => standardizedFeature * model.weights[featureIndex]
+  )
+}
+
 export function predictProbability(model: LogisticRegressionModel, features: number[]): number {
   const standardizedFeatures = standardize(features, model.featureMeans, model.featureScales)
   const weightedSum = standardizedFeatures.reduce(

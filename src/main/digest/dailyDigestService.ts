@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3'
-import { DAILY_DIGEST_SIZE, type DailyDigest, type PreparationProgress } from '@shared/contract'
+import { DAILY_DIGEST_SIZE, type DailyDigest, type PreparationProgress, type RecommendationMode } from '@shared/contract'
 import { computeOldestAllowedPublicationDate } from '../collector/articleAge'
 import { collectFeeds } from '../collector/feedCollector'
 import type { FeedFetcher } from '../collector/feedFetcher'
@@ -41,7 +41,7 @@ export function purgeExpiredArticles(database: Database.Database, now: Date): nu
   return purgeArticlesPublishedBefore(database, computeOldestAllowedPublicationDate(now))
 }
 
-function selectByRoundRobin(candidates: DigestCandidate[]): DigestSelection[] {
+function selectByRoundRobin(candidates: DigestCandidate[], roundRobinMode: RecommendationMode): DigestSelection[] {
   const selectedArticleIds = new Set<number>()
 
   for (
@@ -62,7 +62,12 @@ function selectByRoundRobin(candidates: DigestCandidate[]): DigestSelection[] {
     }
   }
 
-  return [...selectedArticleIds].map((articleId) => ({ articleId, rank: null, isExploration: false }))
+  return [...selectedArticleIds].map((articleId) => ({
+    articleId,
+    rank: null,
+    isExploration: false,
+    recommendationReason: { mode: roundRobinMode, closestTopicId: null, dominantSignal: 'recency' }
+  }))
 }
 
 export function buildDigest(
@@ -70,11 +75,12 @@ export function buildDigest(
   now: Date,
   digestDate: string,
   candidates: DigestCandidate[],
-  recommendation: Omit<RecommendedSelectionOptions, 'database' | 'candidates' | 'now'> | null = null
+  recommendation: Omit<RecommendedSelectionOptions, 'database' | 'candidates' | 'now'> | null = null,
+  roundRobinMode: RecommendationMode = 'cold-start'
 ): void {
   const digestSelections = recommendation
     ? selectByRecommendation({ ...recommendation, database, candidates, now })
-    : selectByRoundRobin(candidates)
+    : selectByRoundRobin(candidates, roundRobinMode)
 
   assignDigestSelections(database, digestSelections, digestDate)
 }
@@ -126,7 +132,8 @@ export async function prepareDailyDigest(
           modelId: resolveEmbeddingModelId(options.embeddingProvider),
           random: options.random ?? Math.random
         }
-      : null
+      : null,
+    recommendationAnalysis.mode
   )
   recordLastDigestMode(database, recommendationAnalysis.mode)
 

@@ -21,7 +21,7 @@ export const SOURCE_CATEGORY_LABELS: Record<SourceCategory, string> = {
 
 export const SOURCE_CATEGORIES = Object.keys(SOURCE_CATEGORY_LABELS) as SourceCategory[]
 
-export type ViewId = 'today' | 'read-later' | 'favorites' | 'profile' | 'sources' | 'settings'
+export type ViewId = 'today' | 'read-later' | 'favorites' | 'search' | 'profile' | 'sources' | 'settings'
 
 export interface NavigationItem {
   viewId: ViewId
@@ -32,6 +32,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
   { viewId: 'today', label: 'Aujourd’hui' },
   { viewId: 'read-later', label: 'Plus tard' },
   { viewId: 'favorites', label: 'Favoris' },
+  { viewId: 'search', label: 'Recherche' },
   { viewId: 'profile', label: 'Mon profil' },
   { viewId: 'sources', label: 'Sources' },
   { viewId: 'settings', label: 'Réglages' }

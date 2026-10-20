@@ -1,8 +1,14 @@
 import type Database from 'better-sqlite3'
-import type { DigestCandidate, DigestSelection } from '../repositories/articleRepository'
+import type {
+  DigestCandidate,
+  DigestSelection,
+  StoredRecommendationReason
+} from '../repositories/articleRepository'
 import { loadArticleVectors, loadTopicVectors } from '../repositories/embeddingRepository'
+import { findClosestTopicId } from './closestTopic'
 import { isArticleOfMutedTopic } from './mutedTopicFilter'
 import { predictProbability, trainLogisticRegression } from './logisticRegression'
+import { resolveDominantSignal } from './recommendationReason'
 import {
   buildRelevanceProfile,
   buildTrainingSamples,
@@ -37,6 +43,8 @@ export function selectByRecommendation(options: RecommendedSelectionOptions): Di
   const visibleCandidates = options.candidates.filter(
     (candidate) => !isArticleOfMutedTopic(articleVectors.get(candidate.id) ?? null, topicVectors, topicPreferences)
   )
+  const recommendationMode = options.isTrainedMode ? 'trained' : 'similarity'
+  const reasonByArticleId = new Map<number, StoredRecommendationReason>()
   const rankedCandidates: RankedCandidate[] = visibleCandidates.map((candidate) => {
     const relevanceFeatures = computeCandidateFeatures(
       relevanceProfile,
@@ -47,6 +55,11 @@ export function selectByRecommendation(options: RecommendedSelectionOptions): Di
       },
       referenceTime
     )
+    reasonByArticleId.set(candidate.id, {
+      mode: recommendationMode,
+      closestTopicId: findClosestTopicId(articleVectors.get(candidate.id) ?? null, topicVectors),
+      dominantSignal: resolveDominantSignal(relevanceFeatures, trainedModel)
+    })
     return {
       id: candidate.id,
       sourceKey: candidate.sourceKey,
@@ -64,5 +77,14 @@ export function selectByRecommendation(options: RecommendedSelectionOptions): Di
     rankedCandidates,
     hasNegativeProfile: relevanceProfile.negativeSum !== null,
     random: options.random
+  }).map((digestSelection) => {
+    const recommendationReason = reasonByArticleId.get(digestSelection.articleId)
+    return {
+      ...digestSelection,
+      recommendationReason:
+        recommendationReason && digestSelection.isExploration
+          ? { ...recommendationReason, dominantSignal: 'exploration' }
+          : recommendationReason
+    }
   })
 }

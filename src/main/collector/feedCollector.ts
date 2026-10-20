@@ -1,14 +1,14 @@
 import type Database from 'better-sqlite3'
-import type { FeedEntry } from '@extractus/feed-extractor'
 import type { Source } from '@shared/contract'
 import { insertArticleIfNew } from '../repositories/articleRepository'
 import { listEnabledSources, recordFetchFailure, recordFetchSuccess } from '../repositories/sourceRepository'
 import { parseHttpUrl } from '../httpUrl'
 import { isFrenchArticle } from '../recommendation/languageDetection'
 import { computeOldestAllowedPublicationDate } from './articleAge'
-import { defaultFeedFetcher, fetchFeedWithTimeout, type FeedFetcher } from './feedFetcher'
+import { defaultFeedFetcher, fetchFeedWithTimeout, type CollectedFeedEntry, type FeedFetcher } from './feedFetcher'
 import { cleanSummary } from './summaryCleaner'
 import { normalizeUrl } from './urlNormalizer'
+import { resolveFeedEntryWordCount } from './wordCount'
 
 export const FEED_COLLECTION_CONCURRENCY = 6
 
@@ -24,7 +24,7 @@ export interface CollectionResult {
   newArticleCount: number
 }
 
-function resolvePublicationDate(entry: FeedEntry, now: Date): Date | null {
+function resolvePublicationDate(entry: CollectedFeedEntry, now: Date): Date | null {
   if (!entry.published) {
     return null
   }
@@ -39,7 +39,7 @@ function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-function storeEntries(database: Database.Database, source: Source, entries: FeedEntry[], now: Date): number {
+function storeEntries(database: Database.Database, source: Source, entries: CollectedFeedEntry[], now: Date): number {
   const oldestAllowedPublicationDate = computeOldestAllowedPublicationDate(now)
   let newArticleCount = 0
 
@@ -66,7 +66,8 @@ function storeEntries(database: Database.Database, source: Source, entries: Feed
         title,
         summary,
         publishedAt,
-        fetchedAt: now.toISOString()
+        fetchedAt: now.toISOString(),
+        wordCount: resolveFeedEntryWordCount(entry)
       })
       if (isInserted) {
         newArticleCount += 1

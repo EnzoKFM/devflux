@@ -117,6 +117,45 @@ export const MIGRATIONS: string[] = [
     ('Blog du Modérateur - IA', 'https://www.blogdumoderateur.com/ia/feed/', 'https://www.blogdumoderateur.com/ia/', 'general')
   ) AS french_source
   WHERE EXISTS (SELECT 1 FROM app_settings WHERE key = 'sources_seeded');
+  `,
+  `
+  ALTER TABLE sources ADD COLUMN last_succeeded_at TEXT;
+  UPDATE sources SET last_succeeded_at = last_fetched_at WHERE last_error IS NULL;
+
+  ALTER TABLE articles ADD COLUMN recommendation_mode TEXT;
+  ALTER TABLE articles ADD COLUMN closest_topic_id TEXT;
+  ALTER TABLE articles ADD COLUMN dominant_signal TEXT;
+  ALTER TABLE articles ADD COLUMN word_count INTEGER;
+
+  CREATE INDEX articles_source_fetched_at_index ON articles(source_id, fetched_at);
+
+  CREATE VIRTUAL TABLE articles_fts USING fts5(
+    title,
+    summary,
+    source_name,
+    content = 'articles',
+    content_rowid = 'id',
+    tokenize = 'unicode61 remove_diacritics 2'
+  );
+
+  CREATE TRIGGER articles_fts_after_insert AFTER INSERT ON articles BEGIN
+    INSERT INTO articles_fts (rowid, title, summary, source_name)
+    VALUES (new.id, new.title, new.summary, new.source_name);
+  END;
+
+  CREATE TRIGGER articles_fts_after_delete AFTER DELETE ON articles BEGIN
+    INSERT INTO articles_fts (articles_fts, rowid, title, summary, source_name)
+    VALUES ('delete', old.id, old.title, old.summary, old.source_name);
+  END;
+
+  CREATE TRIGGER articles_fts_after_update AFTER UPDATE OF title, summary, source_name ON articles BEGIN
+    INSERT INTO articles_fts (articles_fts, rowid, title, summary, source_name)
+    VALUES ('delete', old.id, old.title, old.summary, old.source_name);
+    INSERT INTO articles_fts (rowid, title, summary, source_name)
+    VALUES (new.id, new.title, new.summary, new.source_name);
+  END;
+
+  INSERT INTO articles_fts (articles_fts) VALUES ('rebuild');
   `
 ]
 

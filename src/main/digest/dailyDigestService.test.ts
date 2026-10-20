@@ -384,6 +384,66 @@ describe('recommandation locale dans le fil', () => {
     ])
   })
 
+  it('explique la sélection de chaque article du fil recommandé', async () => {
+    const database = createTestDatabase()
+    database.prepare("INSERT INTO topic_preferences (topic_id, preference) VALUES ('python', 'followed')").run()
+    seedTopicArticles(database, 'python', 15, 1)
+    seedTopicArticles(database, 'rust', 15, 1)
+    const embeddingProvider = createKeywordEmbeddingProvider(['python', 'rust'])
+
+    const digest = await prepareDailyDigest(database, {
+      fetchFeed: emptyFeedFetcher,
+      now: () => FIXED_NOW,
+      embeddingProvider,
+      random: () => 0
+    })
+
+    const reasonBySlug = new Map(
+      digest.articles.map((article) => [article.url.split('/').at(-1), article.recommendationReason])
+    )
+    expect(reasonBySlug.get('python-1')).toEqual({
+      mode: 'similarity',
+      closestTopicLabel: 'Python',
+      dominantSignal: 'similar-content'
+    })
+    expect(
+      digest.articles.filter((article) => article.isExploration).map((article) => article.recommendationReason?.dominantSignal)
+    ).toEqual(['exploration', 'exploration'])
+  })
+
+  it('explique le fil du démarrage à froid par la fraîcheur des articles', async () => {
+    const database = createTestDatabase()
+    seedTopicArticles(database, 'rust', 2, 1)
+
+    const digest = await prepareDailyDigest(database, {
+      fetchFeed: emptyFeedFetcher,
+      now: () => FIXED_NOW,
+      embeddingProvider: createKeywordEmbeddingProvider(['rust'])
+    })
+
+    expect(digest.articles.map((article) => article.recommendationReason)).toEqual([
+      { mode: 'cold-start', closestTopicLabel: null, dominantSignal: 'recency' },
+      { mode: 'cold-start', closestTopicLabel: null, dominantSignal: 'recency' }
+    ])
+  })
+
+  it('explique le repli sur le tourniquet par l indisponibilité du modèle', async () => {
+    const database = createTestDatabase()
+    rateTopicArticles(database, 'rust', 'like', 1)
+    seedTopicArticles(database, 'rust', 2, 1)
+
+    const digest = await prepareDailyDigest(database, {
+      fetchFeed: emptyFeedFetcher,
+      now: () => FIXED_NOW,
+      embeddingProvider: createKeywordEmbeddingProvider(['rust'], { failure: new Error('modèle indisponible') })
+    })
+
+    expect(digest.articles.map((article) => article.recommendationReason)).toEqual([
+      { mode: 'unavailable', closestTopicLabel: null, dominantSignal: 'recency' },
+      { mode: 'unavailable', closestTopicLabel: null, dominantSignal: 'recency' }
+    ])
+  })
+
   it('ne retient que l article en français en mode similarité', async () => {
     const database = createTestDatabase()
     database.prepare("INSERT INTO topic_preferences (topic_id, preference) VALUES ('python', 'followed')").run()

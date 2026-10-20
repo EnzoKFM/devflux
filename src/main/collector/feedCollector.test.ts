@@ -181,4 +181,25 @@ describe('collectFeeds', () => {
     expect(requestedFeedUrls).toHaveLength(9)
     expect(maxRunningFetchCount).toBe(6)
   })
+
+  it('enregistre le nombre de mots des entrées dont le flux fournit le contenu complet', async () => {
+    const database = createTestDatabase()
+    addTestSource(database, 'Blog Un')
+    const fullContent = `<p>${'Le contenu complet de cet article publié en français. '.repeat(40)}</p>`
+    const fetchFeed = createFeedFetcher({
+      'https://blog-un.example.com/feed.xml': {
+        entries: [
+          { ...buildEntry('complet', daysBefore(FIXED_NOW, 1)), fullContent },
+          buildEntry('extrait', daysBefore(FIXED_NOW, 1))
+        ]
+      }
+    })
+
+    await collectFeeds(database, { fetchFeed, now: () => FIXED_NOW })
+
+    expect(database.prepare('SELECT url, word_count FROM articles ORDER BY url').all()).toEqual([
+      { url: 'https://blog.example.com/complet', word_count: 360 },
+      { url: 'https://blog.example.com/extrait', word_count: null }
+    ])
+  })
 })

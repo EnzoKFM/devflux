@@ -1,12 +1,34 @@
-import { extract, type FeedData } from '@extractus/feed-extractor'
+import { extract, type FeedData, type FeedEntry } from '@extractus/feed-extractor'
 
 export const FEED_FETCH_TIMEOUT_IN_MS = 15_000
 export const FEED_USER_AGENT = 'DevFlux/0.1'
 
+export type CollectedFeedEntry = FeedEntry & { fullContent?: string }
+
 export type FeedFetcher = (feedUrl: string, abortSignal: AbortSignal) => Promise<FeedData>
 
+function readTextNode(rawNode: unknown): string | undefined {
+  if (typeof rawNode === 'string') {
+    return rawNode.trim() || undefined
+  }
+  if (rawNode !== null && typeof rawNode === 'object' && '#text' in rawNode) {
+    return readTextNode(rawNode['#text'])
+  }
+  return undefined
+}
+
+export function extractEntryFullContent(rawEntry: Record<string, unknown>): string | undefined {
+  return readTextNode(rawEntry['content:encoded']) ?? readTextNode(rawEntry.content)
+}
+
 export const defaultFeedFetcher: FeedFetcher = (feedUrl, abortSignal) =>
-  extract(feedUrl, { descriptionMaxLen: 0 }, (requestedUrl) =>
+  extract(
+    feedUrl,
+    {
+      descriptionMaxLen: 0,
+      getExtraEntryFields: (rawEntry) => ({ fullContent: extractEntryFullContent(rawEntry) })
+    },
+    (requestedUrl) =>
     fetch(requestedUrl, {
       signal: abortSignal,
       headers: {

@@ -35,7 +35,7 @@ export function buildEntry(slug: string, published: string | undefined, override
   return {
     id: slug,
     link: `https://blog.example.com/${slug}`,
-    title: `Article ${slug}`,
+    title: `Le point de la semaine sur ${slug}`,
     description: `Résumé ${slug}`,
     published,
     ...overrides
@@ -77,7 +77,7 @@ export function insertTestArticle(
     .run(
       options.sourceId,
       `https://blog.example.com/${options.slug}`,
-      options.title ?? `Article ${options.slug}`,
+      options.title ?? `Le point de la semaine sur ${options.slug}`,
       options.publishedAt,
       FIXED_NOW.toISOString(),
       options.digestDate ?? null,

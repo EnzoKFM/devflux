@@ -1,6 +1,14 @@
-import type { FeedbackRating, FeedbackReason, SourceCategory, TopicPreference } from '@shared/contract'
+import {
+  THEME_PREFERENCES,
+  type FeedbackRating,
+  type FeedbackReason,
+  type SourceCategory,
+  type ThemePreference,
+  type TopicPreference
+} from '@shared/contract'
 import { parseHttpUrl } from './httpUrl'
 import { isTopicId, TOPIC_CATALOG } from './profile/topicCatalog'
+import { isThemePreference } from './theme'
 
 const FEEDBACK_RATINGS: readonly FeedbackRating[] = ['like', 'dislike']
 const FEEDBACK_REASONS: readonly FeedbackReason[] = ['off-topic', 'too-basic', 'already-seen', 'bad-source']
@@ -74,4 +82,11 @@ export function parseTopicPreference(value: unknown): TopicPreference {
     throw new Error(`Argument invalide : preference doit être l'une des valeurs ${TOPIC_PREFERENCES.join(', ')}.`)
   }
   return value as TopicPreference
+}
+
+export function parseThemePreference(value: unknown): ThemePreference {
+  if (!isThemePreference(value)) {
+    throw new Error(`Argument invalide : themePreference doit être l'une des valeurs ${THEME_PREFERENCES.join(', ')}.`)
+  }
+  return value
 }

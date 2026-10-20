@@ -1,4 +1,4 @@
-import { ipcMain, shell, type IpcMainInvokeEvent } from 'electron'
+import { ipcMain, nativeTheme, shell, type IpcMainInvokeEvent } from 'electron'
 import type Database from 'better-sqlite3'
 import {
   IPC_CHANNELS,
@@ -7,6 +7,7 @@ import {
   type DailyDigest,
   type DigestArticle,
   type PreparationProgress,
+  type ThemePreference,
   type Source,
   type UserProfile
 } from '@shared/contract'
@@ -25,6 +26,7 @@ import {
   parseReason,
   parseTopicId,
   parseTopicIds,
+  parseThemePreference,
   parseTopicPreference
 } from './ipcValidation'
 import { completeOnboarding, getUserProfile, setTopicPreference } from './profile/profileService'
@@ -41,6 +43,7 @@ import {
 import { deleteFeedback, saveFeedback } from './repositories/feedbackRepository'
 import { listSources } from './repositories/sourceRepository'
 import { addSource, removeSource, setSourceEnabled } from './sources/sourceService'
+import { readThemePreference, saveThemePreference } from './theme'
 
 export interface IpcDependencies {
   database: Database.Database
@@ -153,6 +156,15 @@ export function registerIpcHandlers({ database, autostartContext, embeddingProvi
     (_event, isEnabledArgument: unknown): AutostartStatus =>
       setAutostartEnabled(autostartContext, parseBoolean(isEnabledArgument, 'isEnabled'))
   )
+
+  ipcMain.handle(IPC_CHANNELS.getThemePreference, (): ThemePreference => readThemePreference(database))
+
+  ipcMain.handle(IPC_CHANNELS.setThemePreference, (_event, themePreferenceArgument: unknown): ThemePreference => {
+    const themePreference = parseThemePreference(themePreferenceArgument)
+    saveThemePreference(database, themePreference)
+    nativeTheme.themeSource = themePreference
+    return themePreference
+  })
 
   ipcMain.handle(IPC_CHANNELS.getUserProfile, (): UserProfile => getUserProfile(database, embeddingProvider))
 

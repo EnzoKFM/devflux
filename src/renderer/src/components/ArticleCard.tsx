@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import type { DigestArticle } from '@shared/contract'
 import type { ArticleActionHandlers } from '@renderer/hooks/useArticleActions'
 import { formatAbsoluteDate, formatRelativeDate } from '@renderer/lib/formatDate'
@@ -12,10 +13,19 @@ interface ArticleCardProps {
 }
 
 export function ArticleCard({ article, isSelected, actions, onSelect }: ArticleCardProps) {
+  const cardRef = useRef<HTMLLIElement>(null)
+
+  useEffect(() => {
+    if (isSelected) {
+      cardRef.current?.scrollIntoView({ block: 'nearest' })
+    }
+  }, [isSelected])
+
   return (
     <li
-      className={`border-b border-slate-200 ${
-        isSelected ? 'bg-indigo-50' : article.isRead ? 'bg-slate-50' : 'bg-white'
+      ref={cardRef}
+      className={`border-b border-slate-200 dark:border-slate-700 ${
+        isSelected ? 'bg-indigo-50 dark:bg-indigo-950' : article.isRead ? 'bg-slate-50 dark:bg-slate-950' : 'bg-white dark:bg-slate-900'
       }`}
     >
       <button
@@ -32,14 +42,14 @@ export function ArticleCard({ article, isSelected, actions, onSelect }: ArticleC
           <span className="sr-only">{article.isRead ? 'Lu' : 'Non lu'}</span>
           <span
             className={`block text-[0.95rem] leading-snug ${
-              article.isRead ? 'font-normal text-slate-600' : 'font-semibold text-slate-900'
+              article.isRead ? 'font-normal text-slate-600 dark:text-slate-400' : 'font-semibold text-slate-900 dark:text-slate-100'
             }`}
           >
             {article.title}
           </span>
         </span>
-        <span className="mt-1 ml-4 flex flex-wrap items-center gap-x-2 text-xs text-slate-500">
-          <span className="font-medium text-slate-600">{article.sourceName}</span>
+        <span className="mt-1 ml-4 flex flex-wrap items-center gap-x-2 text-xs text-slate-500 dark:text-slate-400">
+          <span className="font-medium text-slate-600 dark:text-slate-400">{article.sourceName}</span>
           <span aria-hidden="true">·</span>
           <time dateTime={article.publishedAt} title={formatAbsoluteDate(article.publishedAt)}>
             {formatRelativeDate(article.publishedAt)}
@@ -47,7 +57,7 @@ export function ArticleCard({ article, isSelected, actions, onSelect }: ArticleC
           {article.isExploration && <ExplorationBadge />}
         </span>
         {article.summary && (
-          <span className="mt-1.5 ml-4 line-clamp-3 block text-sm leading-relaxed text-slate-600">
+          <span className="mt-1.5 ml-4 line-clamp-3 block text-sm leading-relaxed text-slate-600 dark:text-slate-400">
             {article.summary}
           </span>
         )}

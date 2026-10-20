@@ -4,7 +4,7 @@ export function ExplorationBadge() {
   return (
     <span
       title={EXPLORATION_BADGE_DESCRIPTION}
-      className="rounded-full bg-amber-50 px-2 py-0.5 text-[0.7rem] font-medium text-amber-800"
+      className="rounded-full bg-amber-50 dark:bg-amber-950 px-2 py-0.5 text-[0.7rem] font-medium text-amber-800 dark:text-amber-200"
     >
       {EXPLORATION_BADGE_LABEL}
       <span className="sr-only"> : {EXPLORATION_BADGE_DESCRIPTION}</span>

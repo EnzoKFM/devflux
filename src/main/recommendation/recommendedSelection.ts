@@ -3,6 +3,7 @@ import type { DigestCandidate, DigestSelection } from '../repositories/articleRe
 import { loadArticleVectors, loadTopicVectors } from '../repositories/embeddingRepository'
 import { buildArticleText } from './embeddingStep'
 import { isFrenchText } from './languageDetection'
+import { isArticleOfMutedTopic } from './mutedTopicFilter'
 import { predictProbability, trainLogisticRegression } from './logisticRegression'
 import {
   addFrenchArticleBonus,
@@ -36,7 +37,10 @@ export function selectByRecommendation(options: RecommendedSelectionOptions): Di
     ? trainLogisticRegression(buildTrainingSamples(relevanceProfile, ratedArticles, articleVectors, referenceTime))
     : null
 
-  const rankedCandidates: RankedCandidate[] = options.candidates.map((candidate) => {
+  const visibleCandidates = options.candidates.filter(
+    (candidate) => !isArticleOfMutedTopic(articleVectors.get(candidate.id) ?? null, topicVectors, topicPreferences)
+  )
+  const rankedCandidates: RankedCandidate[] = visibleCandidates.map((candidate) => {
     const relevanceFeatures = computeCandidateFeatures(
       relevanceProfile,
       {

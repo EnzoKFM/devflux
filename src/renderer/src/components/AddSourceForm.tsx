@@ -38,10 +38,10 @@ export function AddSourceForm({ onAddSource }: AddSourceFormProps) {
   }
 
   return (
-    <form onSubmit={submitSource} noValidate className="rounded-lg border border-slate-200 bg-white p-4">
-      <h2 className="text-base font-semibold text-slate-900">Ajouter une source</h2>
+    <form onSubmit={submitSource} noValidate className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+      <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Ajouter une source</h2>
       <div className="mt-3 flex flex-wrap items-end gap-3">
-        <label className="flex min-w-64 flex-1 flex-col gap-1 text-sm text-slate-700">
+        <label className="flex min-w-64 flex-1 flex-col gap-1 text-sm text-slate-700 dark:text-slate-300">
           URL du flux ou du site
           <input
             type="url"
@@ -49,16 +49,16 @@ export function AddSourceForm({ onAddSource }: AddSourceFormProps) {
             disabled={isSubmitting}
             onChange={(event) => setFeedUrl(event.target.value)}
             placeholder="https://exemple.com/feed.xml"
-            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 disabled:opacity-60"
+            className="rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 disabled:opacity-60"
           />
         </label>
-        <label className="flex flex-col gap-1 text-sm text-slate-700">
+        <label className="flex flex-col gap-1 text-sm text-slate-700 dark:text-slate-300">
           Catégorie
           <select
             value={category}
             disabled={isSubmitting}
             onChange={changeCategory}
-            className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 disabled:opacity-60"
+            className="rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 disabled:opacity-60"
           >
             {SOURCE_CATEGORIES.map((sourceCategory) => (
               <option key={sourceCategory} value={sourceCategory}>

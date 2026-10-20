@@ -9,7 +9,7 @@ export function SourcesView() {
   const renderSources = () => {
     if (sourcesResource.status === 'loading') {
       return (
-        <p role="status" className="text-sm text-slate-500">
+        <p role="status" className="text-sm text-slate-500 dark:text-slate-400">
           Chargement des sources…
         </p>
       )
@@ -18,7 +18,7 @@ export function SourcesView() {
     if (sourcesResource.status === 'error') {
       return (
         <div role="alert" className="flex flex-col items-start gap-3">
-          <p className="text-sm text-red-700">Impossible de charger les sources. {sourcesResource.errorMessage}</p>
+          <p className="text-sm text-red-700 dark:text-red-300">Impossible de charger les sources. {sourcesResource.errorMessage}</p>
           <button
             type="button"
             onClick={sourcesResource.reload}
@@ -31,7 +31,7 @@ export function SourcesView() {
     }
 
     if (sourcesResource.value.length === 0) {
-      return <p className="text-sm text-slate-500">Aucune source configurée.</p>
+      return <p className="text-sm text-slate-500 dark:text-slate-400">Aucune source configurée.</p>
     }
 
     return (
@@ -46,7 +46,7 @@ export function SourcesView() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto flex max-w-3xl flex-col gap-5 px-6 py-6">
-        <h1 className="text-2xl font-bold text-slate-900">Sources</h1>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Sources</h1>
         <AddSourceForm onAddSource={addSource} />
         {actionErrorMessage && <ErrorBanner message={actionErrorMessage} />}
         {renderSources()}

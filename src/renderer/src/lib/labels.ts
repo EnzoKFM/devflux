@@ -1,4 +1,4 @@
-import type { FeedbackReason, SourceCategory, TopicPreference } from '@shared/contract'
+import type { FeedbackReason, SourceCategory, ThemePreference, TopicPreference } from '@shared/contract'
 
 export interface FeedbackReasonChoice {
   reason: FeedbackReason | null
@@ -51,3 +51,9 @@ export const TOPIC_PREFERENCE_CHOICES: TopicPreferenceChoice[] = [
   { preference: 'neutral', label: 'Neutre' },
   { preference: 'muted', label: 'Masqué' }
 ]
+
+export const THEME_PREFERENCE_LABELS: Record<ThemePreference, string> = {
+  system: 'Système',
+  light: 'Clair',
+  dark: 'Sombre'
+}

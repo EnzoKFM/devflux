@@ -1,6 +1,6 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, nativeTheme, shell } from 'electron'
 import type Database from 'better-sqlite3'
 import { applyDefaultAutostart, resolveAutostartContext } from './autostart'
 import { openDatabase } from './database/connection'
@@ -10,6 +10,7 @@ import { parseHttpUrl } from './httpUrl'
 import { registerIpcHandlers } from './ipc'
 import { isNavigationAllowed } from './navigationPolicy'
 import { createElectronEmbeddingProvider } from './recommendation/electronEmbeddingProvider'
+import { readThemePreference, resolveWindowBackgroundColor } from './theme'
 
 const DATABASE_FILE_NAME = 'devflux.sqlite'
 const MODELS_DIRECTORY_NAME = 'models'
@@ -33,6 +34,7 @@ function createMainWindow(): BrowserWindow {
     minHeight: 600,
     title: 'DevFlux',
     show: false,
+    backgroundColor: resolveWindowBackgroundColor(nativeTheme.shouldUseDarkColors),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: true,
@@ -82,6 +84,11 @@ function startApplication(): void {
     join(__dirname, EMBEDDING_WORKER_FILE_NAME),
     join(app.getPath('userData'), MODELS_DIRECTORY_NAME)
   )
+
+  nativeTheme.themeSource = readThemePreference(database)
+  nativeTheme.on('updated', () => {
+    mainWindow?.setBackgroundColor(resolveWindowBackgroundColor(nativeTheme.shouldUseDarkColors))
+  })
 
   registerIpcHandlers({ database, autostartContext, embeddingProvider })
   mainWindow = createMainWindow()

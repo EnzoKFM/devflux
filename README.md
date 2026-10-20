@@ -38,12 +38,15 @@ Depuis un terminal intégré à VS Code, la variable `ELECTRON_RUN_AS_NODE=1` pe
 - **Articles vus** : un article affiché dans un fil n'est jamais reproposé. Le bouton « Plus tard » permet de le garder.
 - **Notes** : les 👍 / 👎 et leur raison sont conservés dans la table `feedback` et pris en compte dès le fil du lendemain.
 - **Premier lancement** : choix des sujets suivis, modifiables ensuite dans **Mon profil** (Suivi / Neutre / Masqué).
+- **Raccourcis clavier** (listes d'articles, hors champ de saisie) : `j` / `k` article suivant / précédent, `l` 👍, `d` 👎 (ouvre le choix de la raison).
+- **Thème** : Système (par défaut), Clair ou Sombre, dans **Réglages**.
 - **Données** : base SQLite dans `~/.config/DevFlux/devflux.sqlite`.
 
 ## Recommandation locale
 
 - **Modèle** : `Xenova/paraphrase-multilingual-MiniLM-L12-v2`, multilingue (français et anglais comparés dans le même espace), épinglé sur la révision `2c4055b12046f11709e9df2c122e59ffbdc2f900` (q8, environ 130 Mo), téléchargé une seule fois dans `~/.config/DevFlux/models`. Il tourne dans un processus séparé (`utilityProcess`), lancé seulement pendant l'analyse puis arrêté : pic mesuré d'environ 550 Mo pendant quelques secondes.
 - **Signaux** : 👍 et sujets suivis attirent ; 👎 « hors sujet », « trop basique » ou sans raison et sujets masqués repoussent ; « déjà vu » est neutre ; « mauvaise source » pénalise uniquement la source.
+- **Sujets masqués** : un article dont le sujet le plus proche est masqué (similarité d'au moins 0,35) est exclu du fil, dans les modes `similarity` et `trained`.
 - **Priorité au français** : les articles détectés en français (mots outils du titre et du résumé) reçoivent un bonus de score de 0,05 dans les modes `similarity` et `trained`.
 - **Modes** :
   - `cold-start` (ni note ni sujet) : sélection en tourniquet, un article par source et par tour, du plus récent au plus ancien ;

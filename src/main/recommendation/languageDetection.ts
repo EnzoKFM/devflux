@@ -64,17 +64,73 @@ const ENGLISH_FUNCTION_WORDS = new Set([
   'but'
 ])
 
+const OTHER_LANGUAGE_FUNCTION_WORDS = new Set([
+  'el',
+  'los',
+  'las',
+  'del',
+  'por',
+  'para',
+  'con',
+  'una',
+  'pero',
+  'como',
+  'más',
+  'muy',
+  'sus',
+  'lo',
+  'o',
+  'os',
+  'quem',
+  'da',
+  'dos',
+  'das',
+  'um',
+  'uma',
+  'com',
+  'não',
+  'na',
+  'ao',
+  'di',
+  'della',
+  'delle',
+  'degli',
+  'gli',
+  'che',
+  'sono',
+  'nel',
+  'nella',
+  'per',
+  'der',
+  'die',
+  'und',
+  'ist',
+  'mit',
+  'für',
+  'nicht',
+  'ein',
+  'eine',
+  'den',
+  'von',
+  'zu',
+  'auf'
+])
+
 const MIN_FRENCH_FUNCTION_WORD_COUNT = 2
 
 export function isFrenchText(text: string): boolean {
   let frenchFunctionWordCount = 0
-  let englishFunctionWordCount = 0
+  let foreignFunctionWordCount = 0
   for (const word of text.toLowerCase().split(/[^\p{L}]+/u)) {
     if (FRENCH_FUNCTION_WORDS.has(word)) {
       frenchFunctionWordCount += 1
-    } else if (ENGLISH_FUNCTION_WORDS.has(word)) {
-      englishFunctionWordCount += 1
+    } else if (ENGLISH_FUNCTION_WORDS.has(word) || OTHER_LANGUAGE_FUNCTION_WORDS.has(word)) {
+      foreignFunctionWordCount += 1
     }
   }
-  return frenchFunctionWordCount >= MIN_FRENCH_FUNCTION_WORD_COUNT && frenchFunctionWordCount > englishFunctionWordCount
+  return frenchFunctionWordCount >= MIN_FRENCH_FUNCTION_WORD_COUNT && frenchFunctionWordCount > foreignFunctionWordCount
+}
+
+export function isFrenchArticle(title: string, summary: string | null): boolean {
+  return isFrenchText(`${title}\n${summary ?? ''}`)
 }

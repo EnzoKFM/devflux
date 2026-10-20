@@ -1,8 +1,7 @@
 import type Database from 'better-sqlite3'
 import type { DigestCandidate, DigestSelection } from '../repositories/articleRepository'
 import { loadArticleVectors, loadTopicVectors } from '../repositories/embeddingRepository'
-import { buildArticleText } from './embeddingStep'
-import { isFrenchText } from './languageDetection'
+import { isFrenchArticle } from './languageDetection'
 import { isArticleOfMutedTopic } from './mutedTopicFilter'
 import { predictProbability, trainLogisticRegression } from './logisticRegression'
 import {
@@ -57,7 +56,7 @@ export function selectByRecommendation(options: RecommendedSelectionOptions): Di
         trainedModel
           ? predictProbability(trainedModel, toFeatureVector(relevanceFeatures))
           : computeSimilarityScore(relevanceFeatures),
-        isFrenchText(buildArticleText(candidate.title, candidate.summary))
+        isFrenchArticle(candidate.title, candidate.summary)
       ),
       positiveSimilarity: relevanceFeatures.positiveSimilarity,
       negativeSimilarity: relevanceFeatures.negativeSimilarity,

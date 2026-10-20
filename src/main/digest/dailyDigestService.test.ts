@@ -152,6 +152,19 @@ describe('prepareDailyDigest', () => {
     expect(digest.articles.map((article) => article.url)).toEqual(['https://blog.example.com/neuf'])
   })
 
+  it('écarte du fil les articles déjà collectés qui ne sont pas en français', async () => {
+    const database = createTestDatabase()
+    const sourceId = addTestSource(database, 'Blog Un')
+    const publishedAt = daysBefore(FIXED_NOW, 1)
+    insertTestArticle(database, { sourceId, slug: 'francais', title: 'Les nouveautés de Python pour les développeurs', publishedAt })
+    insertTestArticle(database, { sourceId, slug: 'anglais', title: 'What is new in the Python release for your team', publishedAt })
+    insertTestArticle(database, { sourceId, slug: 'portugais', title: 'O agente mudou as próprias regras. Quem aprovou a nova versão?', publishedAt })
+
+    const digest = await prepareDailyDigest(database, { fetchFeed: async () => ({ entries: [] }), now: () => FIXED_NOW })
+
+    expect(digest.articles.map((article) => article.url)).toEqual(['https://blog.example.com/francais'])
+  })
+
   it('publie les étapes de progression dans l ordre', async () => {
     const database = createTestDatabase()
     addTestSource(database, 'Blog Un')
@@ -371,7 +384,7 @@ describe('recommandation locale dans le fil', () => {
     ])
   })
 
-  it('fait passer un article en français devant un article anglais de pertinence égale', async () => {
+  it('ne retient que l article en français en mode similarité', async () => {
     const database = createTestDatabase()
     database.prepare("INSERT INTO topic_preferences (topic_id, preference) VALUES ('python', 'followed')").run()
     insertTestArticle(database, {
@@ -395,7 +408,7 @@ describe('recommandation locale dans le fil', () => {
       random: () => 0
     })
 
-    expect(digest.articles.map((article) => article.url.split('/').at(-1))).toEqual(['python-francais', 'python-anglais'])
+    expect(digest.articles.map((article) => article.url.split('/').at(-1))).toEqual(['python-francais'])
   })
 
   it('passe en apprentissage supervisé avec assez de 👍 et de 👎', async () => {
@@ -546,6 +559,6 @@ describe('recommandation locale dans le fil', () => {
 
     await prepareDailyDigest(database, { fetchFeed: emptyFeedFetcher, now: () => FIXED_NOW, embeddingProvider })
 
-    expect(embeddingProvider.embeddedTexts).toContain(`Article note-rust-${RATED_ARTICLE_VARIANT_OFFSET + 1}`)
+    expect(embeddingProvider.embeddedTexts).toContain(`Le point de la semaine sur note-rust-${RATED_ARTICLE_VARIANT_OFFSET + 1}`)
   })
 })

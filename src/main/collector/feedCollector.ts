@@ -4,6 +4,7 @@ import type { Source } from '@shared/contract'
 import { insertArticleIfNew } from '../repositories/articleRepository'
 import { listEnabledSources, recordFetchFailure, recordFetchSuccess } from '../repositories/sourceRepository'
 import { parseHttpUrl } from '../httpUrl'
+import { isFrenchArticle } from '../recommendation/languageDetection'
 import { computeOldestAllowedPublicationDate } from './articleAge'
 import { defaultFeedFetcher, fetchFeedWithTimeout, type FeedFetcher } from './feedFetcher'
 import { cleanSummary } from './summaryCleaner'
@@ -54,12 +55,16 @@ function storeEntries(database: Database.Database, source: Source, entries: Feed
       if (publishedAt < oldestAllowedPublicationDate) {
         continue
       }
+      const summary = cleanSummary(entry.description)
+      if (!isFrenchArticle(title, summary)) {
+        continue
+      }
       const isInserted = insertArticleIfNew(database, {
         sourceId: source.id,
         sourceName: source.name,
         url: normalizeUrl(articleUrl.href),
         title,
-        summary: cleanSummary(entry.description),
+        summary,
         publishedAt,
         fetchedAt: now.toISOString()
       })

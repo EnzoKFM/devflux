@@ -22,7 +22,7 @@ describe('applyMigrations', () => {
       'topic_embeddings',
       'topic_preferences'
     ])
-    expect(database.pragma('user_version', { simple: true })).toBe(2)
+    expect(database.pragma('user_version', { simple: true })).toBe(3)
   })
 
   it('est idempotente', () => {
@@ -32,7 +32,7 @@ describe('applyMigrations', () => {
     applyMigrations(database)
     applyMigrations(database)
 
-    expect(database.pragma('user_version', { simple: true })).toBe(2)
+    expect(database.pragma('user_version', { simple: true })).toBe(3)
     expect(database.prepare('SELECT value FROM app_settings WHERE key = ?').get('cle')).toEqual({ value: 'valeur' })
   })
 
@@ -53,13 +53,43 @@ describe('applyMigrations', () => {
 
     applyMigrations(database)
 
-    expect(database.pragma('user_version', { simple: true })).toBe(2)
+    expect(database.pragma('user_version', { simple: true })).toBe(3)
     expect(database.prepare('SELECT title, digest_rank, is_exploration FROM articles').get()).toEqual({
       title: 'Article a',
       digest_rank: null,
       is_exploration: 0
     })
     expect(database.prepare('SELECT COUNT(*) AS feedbackCount FROM feedback').get()).toEqual({ feedbackCount: 1 })
+  })
+
+  it('désactive les sources anglophones de départ et laisse les autres actives', () => {
+    const database = new Database(':memory:')
+    database.pragma('foreign_keys = ON')
+    database.exec(MIGRATIONS[0])
+    database.exec(MIGRATIONS[1])
+    database.pragma('user_version = 2')
+    const insertSourceStatement = database.prepare(
+      "INSERT INTO sources (name, feed_url, category, created_at) VALUES (?, ?, 'web', '2026-10-18T00:00:00.000Z')"
+    )
+    insertSourceStatement.run('Smashing Magazine', 'https://www.smashingmagazine.com/feed/')
+    insertSourceStatement.run('Hacker News (150+ points)', 'https://hnrss.org/frontpage?points=150')
+    insertSourceStatement.run('Grafikart', 'https://grafikart.fr/feed.rss')
+    insertSourceStatement.run('Blog perso', 'https://perso.example.com/feed.xml')
+
+    applyMigrations(database)
+
+    expect(database.prepare('SELECT name, is_enabled FROM sources ORDER BY name').all()).toEqual([
+      { name: 'Blog perso', is_enabled: 1 },
+      { name: 'Grafikart', is_enabled: 1 },
+      { name: 'Hacker News (150+ points)', is_enabled: 0 },
+      { name: 'Smashing Magazine', is_enabled: 0 }
+    ])
+  })
+
+  it('n ajoute aucune source à une base jamais initialisée', () => {
+    const database = createTestDatabase()
+
+    expect(database.prepare('SELECT COUNT(*) AS sourceCount FROM sources').get()).toEqual({ sourceCount: 0 })
   })
 
   it('refuse une préférence de sujet autre que suivi ou masqué', () => {

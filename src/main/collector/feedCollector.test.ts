@@ -34,6 +34,35 @@ describe('collectFeeds', () => {
     expect(result).toEqual({ succeededSourceCount: 1, failedSourceCount: 0, newArticleCount: 2 })
   })
 
+  it('n enregistre que les entrées rédigées en français', async () => {
+    const database = createTestDatabase()
+    addTestSource(database, 'Blog Un')
+    const publishedAt = daysBefore(FIXED_NOW, 1)
+    const fetchFeed = createFeedFetcher({
+      'https://blog-un.example.com/feed.xml': {
+        entries: [
+          buildEntry('francais', publishedAt, {
+            title: 'Les nouveautés de PHP 8.5 pour les développeurs',
+            description: 'Un tour des fonctionnalités qui arrivent dans cette version.'
+          }),
+          buildEntry('anglais', publishedAt, {
+            title: 'What is new in PHP 8.5 for your team',
+            description: 'A tour of the features that are coming in this release.'
+          }),
+          buildEntry('espagnol', publishedAt, {
+            title: 'Qwen3-4B deslop corta las muletillas de IA de 121 a 12,5 por 1000 palabras',
+            description: 'Un modelo pequeño para limpiar los textos generados por la IA.'
+          })
+        ]
+      }
+    })
+
+    const result = await collectFeeds(database, { fetchFeed, now: () => FIXED_NOW })
+
+    expect(readArticles(database).map((article) => article.url)).toEqual(['https://blog.example.com/francais'])
+    expect(result.newArticleCount).toBe(1)
+  })
+
   it('ramène une date future à maintenant', async () => {
     const database = createTestDatabase()
     addTestSource(database, 'Blog Un')

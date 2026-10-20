@@ -5,6 +5,7 @@ import { collectFeeds } from '../collector/feedCollector'
 import type { FeedFetcher } from '../collector/feedFetcher'
 import type { EmbeddingProvider } from '../recommendation/embeddingProvider'
 import { resolveEmbeddingModelId } from '../recommendation/embeddingStep'
+import { isFrenchArticle } from '../recommendation/languageDetection'
 import {
   analyzeForRecommendation,
   recordLastDigestMode
@@ -104,7 +105,9 @@ export async function prepareDailyDigest(
     onSourceProcessed: (completedSourceCount) => reportProgress('collecting', completedSourceCount)
   })
 
-  const candidates = listDigestCandidates(database, computeOldestAllowedPublicationDate(now()))
+  const candidates = listDigestCandidates(database, computeOldestAllowedPublicationDate(now())).filter((candidate) =>
+    isFrenchArticle(candidate.title, candidate.summary)
+  )
   const recommendationAnalysis = await analyzeForRecommendation(database, candidates, options.embeddingProvider, {
     onAnalysisStarted: () => reportProgress('analyzing', totalSourceCount),
     onModelDownloadRequired: () => reportProgress('downloading-model', totalSourceCount)

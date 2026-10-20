@@ -26,6 +26,7 @@ Depuis un terminal intégré à VS Code, la variable `ELECTRON_RUN_AS_NODE=1` pe
 
 1. `npm run dist`
 2. Lancer `../build/DevFlux-0.1.0.AppImage` une première fois : le démarrage automatique (`~/.config/autostart/devflux.desktop`) est activé par défaut et se désactive dans **Réglages**.
+3. À chaque lancement, DevFlux installe son icône (`~/.local/share/icons/hicolor/512x512/apps/devflux.png`) et son lanceur (`~/.local/share/applications/devflux.desktop`), pointant vers l'AppImage lancée : l'application apparaît dans le menu et le dock avec son logo. Si le démarrage automatique est activé, seule sa ligne `Icon=` est mise à jour. Ces deux fichiers sont à supprimer à la main si l'AppImage est retirée.
 
 ## Fonctionnement
 
@@ -64,9 +65,10 @@ Depuis un terminal intégré à VS Code, la variable `ELECTRON_RUN_AS_NODE=1` pe
 | Dossier | Contenu |
 |---|---|
 | `src/shared/contract.ts` | Types et canaux IPC partagés |
-| `src/main/` | Processus principal : base, collecte, fil du jour, extraction d'article, démarrage automatique, IPC |
+| `src/main/` | Processus principal : base, collecte, fil du jour, extraction d'article, démarrage automatique, intégration bureau (icône et lanceur), IPC |
 | `src/main/recommendation/` | Embeddings (worker), score, régression logistique, sélection |
 | `src/main/profile/` | Catalogue des sujets et profil |
 | `src/preload/` | Pont `window.devflux` |
 | `src/renderer/` | Interface React (Tailwind) ; le contenu des articles est assaini avec DOMPurify |
 | `src/main/database/seedSources.json` | Sources de départ, insérées au premier lancement ; les bases existantes reçoivent les nouveaux flux via la migration 3 |
+| `resources/icon.svg`, `resources/icon.png` | Logo (source SVG et PNG 512 px), icône de l'AppImage, de la fenêtre et du lanceur |

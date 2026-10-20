@@ -2,10 +2,12 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { app, BrowserWindow, nativeTheme, shell } from 'electron'
 import type Database from 'better-sqlite3'
-import { applyDefaultAutostart, resolveAutostartContext } from './autostart'
+import applicationIconFilePath from '../../resources/icon.png?asset'
+import { applyDefaultAutostart, refreshEnabledAutostart, resolveAutostartContext } from './autostart'
 import { openDatabase } from './database/connection'
 import { seedSourcesOnce, type SeedSource } from './database/seedSources'
 import seedSources from './database/seedSources.json'
+import { installDesktopIntegration, resolveDesktopIntegrationPaths } from './desktopIntegration'
 import { parseHttpUrl } from './httpUrl'
 import { registerIpcHandlers } from './ipc'
 import { isNavigationAllowed } from './navigationPolicy'
@@ -33,6 +35,7 @@ function createMainWindow(): BrowserWindow {
     minWidth: 900,
     minHeight: 600,
     title: 'DevFlux',
+    icon: applicationIconFilePath,
     show: false,
     backgroundColor: resolveWindowBackgroundColor(nativeTheme.shouldUseDarkColors),
     webPreferences: {
@@ -72,12 +75,21 @@ function startApplication(): void {
   const startedAt = new Date().toISOString()
   seedSourcesOnce(database, seedSources as SeedSource[], startedAt)
 
+  const desktopIntegrationPaths = resolveDesktopIntegrationPaths(process.env, homedir())
   const autostartContext = resolveAutostartContext({
     isPackaged: app.isPackaged,
     environment: process.env,
     homeDirectory: homedir(),
-    executablePath: process.execPath
+    executablePath: process.execPath,
+    iconFilePath: desktopIntegrationPaths.iconFilePath
   })
+  installDesktopIntegration({
+    isSupported: autostartContext.isSupported,
+    executablePath: autostartContext.executablePath,
+    bundledIconFilePath: applicationIconFilePath,
+    ...desktopIntegrationPaths
+  })
+  refreshEnabledAutostart(autostartContext)
   applyDefaultAutostart(database, autostartContext, startedAt)
 
   const embeddingProvider = createElectronEmbeddingProvider(

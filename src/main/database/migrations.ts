@@ -66,7 +66,7 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE articles ADD COLUMN is_exploration INTEGER NOT NULL DEFAULT 0;
   `,
   `
-  UPDATE sources SET is_enabled = 0 WHERE feed_url IN (
+  DELETE FROM sources WHERE feed_url IN (
     'https://www.smashingmagazine.com/feed/',
     'https://web.dev/feed.xml',
     'https://developer.chrome.com/static/blog/feed.xml',

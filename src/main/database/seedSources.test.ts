@@ -85,7 +85,7 @@ describe('seedSourcesOnce', () => {
     }
   })
 
-  it('ne livre aucune source que les migrations désactivent', () => {
+  it('ne livre aucune source que les migrations suppriment', () => {
     const database = new Database(':memory:')
     database.pragma('foreign_keys = ON')
     database.exec(MIGRATIONS[0])
@@ -95,6 +95,6 @@ describe('seedSourcesOnce', () => {
 
     applyMigrations(database)
 
-    expect(listSources(database).filter((source) => !source.isEnabled)).toEqual([])
+    expect(listSources(database)).toHaveLength(seedSourcesJson.length)
   })
 })

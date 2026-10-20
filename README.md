@@ -45,14 +45,13 @@ Depuis un terminal intégré à VS Code, la variable `ELECTRON_RUN_AS_NODE=1` pe
 ## Langue
 
 - **Français uniquement** : un article n'est retenu que si son titre et son résumé contiennent au moins deux mots outils français, et plus de mots outils français que de mots outils anglais, espagnols, portugais, italiens ou allemands. Le filtre s'applique à la collecte et à la sélection du fil.
-- **Sources de départ** : 20 flux français (dev, sécurité, IA). La migration 3 désactive les anciennes sources anglophones sans les supprimer (notes et historique conservés) et ajoute les nouveaux flux français aux bases existantes. Une source anglophone réactivée ou ajoutée à la main n'apporte aucun article.
+- **Sources de départ** : 20 flux français (dev, sécurité, IA). La migration 3 supprime les anciennes sources anglophones (leurs articles et leurs notes sont conservés) et ajoute les nouveaux flux français aux bases existantes. Une source anglophone ajoutée à la main n'apporte aucun article.
 
 ## Recommandation locale
 
 - **Modèle** : `Xenova/paraphrase-multilingual-MiniLM-L12-v2`, multilingue (français et anglais comparés dans le même espace), épinglé sur la révision `2c4055b12046f11709e9df2c122e59ffbdc2f900` (q8, environ 130 Mo), téléchargé une seule fois dans `~/.config/DevFlux/models`. Il tourne dans un processus séparé (`utilityProcess`), lancé seulement pendant l'analyse puis arrêté : pic mesuré d'environ 550 Mo pendant quelques secondes.
 - **Signaux** : 👍 et sujets suivis attirent ; 👎 « hors sujet », « trop basique » ou sans raison et sujets masqués repoussent ; « déjà vu » est neutre ; « mauvaise source » pénalise uniquement la source.
 - **Sujets masqués** : un article dont le sujet le plus proche est masqué (similarité d'au moins 0,35) est exclu du fil, dans les modes `similarity` et `trained`.
-- **Priorité au français** : les articles détectés en français (mots outils du titre et du résumé) reçoivent un bonus de score de 0,05 dans les modes `similarity` et `trained`. Depuis le filtre **Français uniquement**, tous les candidats en bénéficient : le bonus ne départage plus aucun article.
 - **Modes** :
   - `cold-start` (ni note ni sujet) : sélection en tourniquet, un article par source et par tour, du plus récent au plus ancien ;
   - `similarity` : ressemblance avec les centroïdes positif et négatif, affinité de la source et fraîcheur ;

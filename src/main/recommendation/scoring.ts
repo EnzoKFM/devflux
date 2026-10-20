@@ -9,7 +9,6 @@ export const SOURCE_AFFINITY_PRIOR_STRENGTH = 2
 export const NEGATIVE_SIMILARITY_WEIGHT = 0.5
 export const SOURCE_AFFINITY_WEIGHT = 0.15
 export const FRESHNESS_WEIGHT = 0.05
-export const FRENCH_ARTICLE_SCORE_BONUS = 0.05
 
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000
 
@@ -186,10 +185,6 @@ export function computeSimilarityScore(relevanceFeatures: RelevanceFeatures): nu
     SOURCE_AFFINITY_WEIGHT * relevanceFeatures.sourceAffinity +
     FRESHNESS_WEIGHT * relevanceFeatures.freshness
   )
-}
-
-export function addFrenchArticleBonus(score: number, isFrenchArticle: boolean): number {
-  return isFrenchArticle ? score + FRENCH_ARTICLE_SCORE_BONUS : score
 }
 
 export function toFeatureVector(relevanceFeatures: RelevanceFeatures): number[] {

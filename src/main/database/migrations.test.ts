@@ -62,7 +62,7 @@ describe('applyMigrations', () => {
     expect(database.prepare('SELECT COUNT(*) AS feedbackCount FROM feedback').get()).toEqual({ feedbackCount: 1 })
   })
 
-  it('désactive les sources anglophones de départ et laisse les autres actives', () => {
+  it('supprime les sources anglophones de départ en conservant leurs articles et leurs notes', () => {
     const database = new Database(':memory:')
     database.pragma('foreign_keys = ON')
     database.exec(MIGRATIONS[0])
@@ -75,15 +75,27 @@ describe('applyMigrations', () => {
     insertSourceStatement.run('Hacker News (150+ points)', 'https://hnrss.org/frontpage?points=150')
     insertSourceStatement.run('Grafikart', 'https://grafikart.fr/feed.rss')
     insertSourceStatement.run('Blog perso', 'https://perso.example.com/feed.xml')
+    database
+      .prepare(
+        `INSERT INTO articles (source_id, source_name, url, title, published_at, fetched_at, digest_date)
+         VALUES (1, 'Smashing Magazine', 'https://www.smashingmagazine.com/a', 'Article a', '2026-10-18T00:00:00.000Z', '2026-10-18T00:00:00.000Z', '2026-10-18')`
+      )
+      .run()
+    database
+      .prepare("INSERT INTO feedback (article_id, rating, reason, created_at) VALUES (1, 'like', NULL, '2026-10-18T00:00:00.000Z')")
+      .run()
 
     applyMigrations(database)
 
     expect(database.prepare('SELECT name, is_enabled FROM sources ORDER BY name').all()).toEqual([
       { name: 'Blog perso', is_enabled: 1 },
-      { name: 'Grafikart', is_enabled: 1 },
-      { name: 'Hacker News (150+ points)', is_enabled: 0 },
-      { name: 'Smashing Magazine', is_enabled: 0 }
+      { name: 'Grafikart', is_enabled: 1 }
     ])
+    expect(database.prepare('SELECT source_id, source_name FROM articles').get()).toEqual({
+      source_id: null,
+      source_name: 'Smashing Magazine'
+    })
+    expect(database.prepare('SELECT COUNT(*) AS feedbackCount FROM feedback').get()).toEqual({ feedbackCount: 1 })
   })
 
   it('n ajoute aucune source à une base jamais initialisée', () => {

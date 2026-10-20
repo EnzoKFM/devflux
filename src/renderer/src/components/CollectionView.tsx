@@ -3,6 +3,7 @@ import { useAsyncResource } from '@renderer/hooks/useAsyncResource'
 import type { ApplyArticlePatch } from '@renderer/hooks/useArticlePatches'
 import { ArticleListHeader } from './ArticleListHeader'
 import { ArticleListView } from './ArticleListView'
+import { FavoritesExport } from './FavoritesExport'
 
 export type CollectionKind = 'read-later' | 'favorites'
 
@@ -61,7 +62,12 @@ export function CollectionView({ collectionKind, patchedArticlesOf, applyArticle
       articles={articles}
       applyArticlePatch={applyArticlePatch}
       emptyMessage={presentation.emptyMessage}
-      header={<ArticleListHeader title={presentation.title} articleCount={articles.length} />}
+      header={
+        <>
+          <ArticleListHeader title={presentation.title} articleCount={articles.length} />
+          {collectionKind === 'favorites' && <FavoritesExport />}
+        </>
+      }
     />
   )
 }

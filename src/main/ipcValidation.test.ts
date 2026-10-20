@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { SEARCH_QUERY_MAX_LENGTH } from '@shared/contract'
 import {
   parseBoolean,
   parseCategory,
@@ -6,6 +7,7 @@ import {
   parseIdentifier,
   parseRating,
   parseReason,
+  parseSearchQuery,
   parseTopicId,
   parseTopicIds,
   parseTopicPreference
@@ -60,6 +62,14 @@ describe('validation des arguments IPC', () => {
     expect(parseTopicPreference('muted')).toBe('muted')
     for (const invalidPreference of ['autre', '', null, undefined, 1]) {
       expect(() => parseTopicPreference(invalidPreference)).toThrow('preference')
+    }
+  })
+
+  it(`n accepte qu une recherche textuelle d au plus ${SEARCH_QUERY_MAX_LENGTH} caractères`, () => {
+    expect(parseSearchQuery('rust async')).toBe('rust async')
+    expect(parseSearchQuery('a'.repeat(SEARCH_QUERY_MAX_LENGTH))).toHaveLength(SEARCH_QUERY_MAX_LENGTH)
+    for (const invalidQuery of ['a'.repeat(SEARCH_QUERY_MAX_LENGTH + 1), 3, null, undefined, ['rust']]) {
+      expect(() => parseSearchQuery(invalidQuery)).toThrow('query')
     }
   })
 })

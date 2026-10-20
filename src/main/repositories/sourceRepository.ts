@@ -1,5 +1,6 @@
 import type Database from 'better-sqlite3'
-import type { Source, SourceCategory } from '@shared/contract'
+import { SOURCE_HEALTH_WINDOW_IN_DAYS, type Source, type SourceCategory } from '@shared/contract'
+import { MILLISECONDS_PER_DAY } from '@shared/time'
 
 interface SourceRow {
   id: number
@@ -9,7 +10,10 @@ interface SourceRow {
   category: SourceCategory
   is_enabled: number
   last_fetched_at: string | null
+  last_succeeded_at: string | null
   last_error: string | null
+  created_at: string
+  recent_article_count: number
 }
 
 export interface NewSource {
@@ -19,7 +23,18 @@ export interface NewSource {
   category: SourceCategory
 }
 
-const SOURCE_COLUMNS = 'id, name, feed_url, site_url, category, is_enabled, last_fetched_at, last_error'
+const SOURCE_SELECT = `
+  SELECT
+    sources.id, sources.name, sources.feed_url, sources.site_url, sources.category, sources.is_enabled,
+    sources.last_fetched_at, sources.last_succeeded_at, sources.last_error, sources.created_at,
+    (SELECT COUNT(*) FROM articles WHERE articles.source_id = sources.id AND articles.fetched_at >= @recentSince)
+      AS recent_article_count
+  FROM sources
+`
+
+function computeRecentSince(now: Date): string {
+  return new Date(now.getTime() - SOURCE_HEALTH_WINDOW_IN_DAYS * MILLISECONDS_PER_DAY).toISOString()
+}
 
 function mapSourceRow(sourceRow: SourceRow): Source {
   return {
@@ -30,28 +45,31 @@ function mapSourceRow(sourceRow: SourceRow): Source {
     category: sourceRow.category,
     isEnabled: sourceRow.is_enabled === 1,
     lastFetchedAt: sourceRow.last_fetched_at,
-    lastError: sourceRow.last_error
+    lastSucceededAt: sourceRow.last_succeeded_at,
+    lastError: sourceRow.last_error,
+    createdAt: sourceRow.created_at,
+    recentArticleCount: sourceRow.recent_article_count
   }
 }
 
-export function listSources(database: Database.Database): Source[] {
+export function listSources(database: Database.Database, now: Date = new Date()): Source[] {
   const sourceRows = database
-    .prepare(`SELECT ${SOURCE_COLUMNS} FROM sources ORDER BY category, name COLLATE NOCASE`)
-    .all() as SourceRow[]
+    .prepare(`${SOURCE_SELECT} ORDER BY sources.category, sources.name COLLATE NOCASE`)
+    .all({ recentSince: computeRecentSince(now) }) as SourceRow[]
   return sourceRows.map(mapSourceRow)
 }
 
-export function listEnabledSources(database: Database.Database): Source[] {
+export function listEnabledSources(database: Database.Database, now: Date = new Date()): Source[] {
   const sourceRows = database
-    .prepare(`SELECT ${SOURCE_COLUMNS} FROM sources WHERE is_enabled = 1 ORDER BY id`)
-    .all() as SourceRow[]
+    .prepare(`${SOURCE_SELECT} WHERE sources.is_enabled = 1 ORDER BY sources.id`)
+    .all({ recentSince: computeRecentSince(now) }) as SourceRow[]
   return sourceRows.map(mapSourceRow)
 }
 
-export function findSourceById(database: Database.Database, sourceId: number): Source | null {
-  const sourceRow = database.prepare(`SELECT ${SOURCE_COLUMNS} FROM sources WHERE id = ?`).get(sourceId) as
-    | SourceRow
-    | undefined
+export function findSourceById(database: Database.Database, sourceId: number, now: Date = new Date()): Source | null {
+  const sourceRow = database
+    .prepare(`${SOURCE_SELECT} WHERE sources.id = @sourceId`)
+    .get({ sourceId, recentSince: computeRecentSince(now) }) as SourceRow | undefined
   return sourceRow ? mapSourceRow(sourceRow) : null
 }
 
@@ -79,7 +97,9 @@ export function deleteSource(database: Database.Database, sourceId: number): voi
 }
 
 export function recordFetchSuccess(database: Database.Database, sourceId: number, fetchedAt: string): void {
-  database.prepare('UPDATE sources SET last_fetched_at = ?, last_error = NULL WHERE id = ?').run(fetchedAt, sourceId)
+  database
+    .prepare('UPDATE sources SET last_fetched_at = ?, last_succeeded_at = ?, last_error = NULL WHERE id = ?')
+    .run(fetchedAt, fetchedAt, sourceId)
 }
 
 export function recordFetchFailure(

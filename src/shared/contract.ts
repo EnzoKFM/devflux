@@ -1,11 +1,27 @@
 export const ARTICLE_MAX_AGE_IN_DAYS = 14
 export const DAILY_DIGEST_SIZE = 20
+export const SOURCE_HEALTH_WINDOW_IN_DAYS = 7
+export const SEARCH_QUERY_MAX_LENGTH = 200
 
 export type FeedbackRating = 'like' | 'dislike'
 
 export type FeedbackReason = 'off-topic' | 'too-basic' | 'already-seen' | 'bad-source'
 
 export type SourceCategory = 'web' | 'software' | 'general'
+
+export type RecommendationSignal =
+  | 'similar-content'
+  | 'avoids-dislikes'
+  | 'liked-source'
+  | 'freshness'
+  | 'exploration'
+  | 'recency'
+
+export interface RecommendationReason {
+  mode: RecommendationMode | null
+  closestTopicLabel: string | null
+  dominantSignal: RecommendationSignal
+}
 
 export interface DigestArticle {
   id: number
@@ -20,6 +36,8 @@ export interface DigestArticle {
   rating: FeedbackRating | null
   feedbackReason: FeedbackReason | null
   isExploration: boolean
+  recommendationReason: RecommendationReason | null
+  wordCount: number | null
 }
 
 export interface Source {
@@ -30,7 +48,16 @@ export interface Source {
   category: SourceCategory
   isEnabled: boolean
   lastFetchedAt: string | null
+  lastSucceededAt: string | null
   lastError: string | null
+  createdAt: string
+  recentArticleCount: number
+}
+
+export interface SourcesImportReport {
+  rejectedCount: number
+  importedCount: number
+  skippedCount: number
 }
 
 export interface CollectionReport {
@@ -104,6 +131,8 @@ export interface DevFluxApi {
   onPreparationProgress(listener: (progress: PreparationProgress) => void): () => void
   listReadLaterArticles(): Promise<DigestArticle[]>
   listFavoriteArticles(): Promise<DigestArticle[]>
+  searchArticles(query: string): Promise<DigestArticle[]>
+  exportFavoritesMarkdown(): Promise<boolean>
   getArticleContent(articleId: number): Promise<ArticleContent>
   markArticleAsRead(articleId: number): Promise<void>
   rateArticle(articleId: number, rating: FeedbackRating, reason: FeedbackReason | null): Promise<void>
@@ -115,6 +144,8 @@ export interface DevFluxApi {
   addSource(feedUrl: string, category: SourceCategory): Promise<Source>
   setSourceEnabled(sourceId: number, isEnabled: boolean): Promise<void>
   removeSource(sourceId: number): Promise<void>
+  exportSourcesOpml(): Promise<boolean>
+  importSourcesOpml(): Promise<SourcesImportReport | null>
   getAutostartStatus(): Promise<AutostartStatus>
   setAutostartEnabled(isEnabled: boolean): Promise<AutostartStatus>
   getThemePreference(): Promise<ThemePreference>
@@ -129,6 +160,8 @@ export const IPC_CHANNELS = {
   preparationProgress: 'digest:progress',
   listReadLaterArticles: 'articles:list-read-later',
   listFavoriteArticles: 'articles:list-favorites',
+  searchArticles: 'articles:search',
+  exportFavoritesMarkdown: 'articles:export-favorites-markdown',
   getArticleContent: 'articles:get-content',
   markArticleAsRead: 'articles:mark-read',
   rateArticle: 'articles:rate',
@@ -140,6 +173,8 @@ export const IPC_CHANNELS = {
   addSource: 'sources:add',
   setSourceEnabled: 'sources:set-enabled',
   removeSource: 'sources:remove',
+  exportSourcesOpml: 'sources:export-opml',
+  importSourcesOpml: 'sources:import-opml',
   getAutostartStatus: 'autostart:get-status',
   setAutostartEnabled: 'autostart:set-enabled',
   getThemePreference: 'theme:get-preference',

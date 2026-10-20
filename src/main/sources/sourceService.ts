@@ -1,12 +1,13 @@
 import type Database from 'better-sqlite3'
 import type { FeedData } from '@extractus/feed-extractor'
-import type { Source, SourceCategory } from '@shared/contract'
+import type { Source, SourceCategory, SourcesImportReport } from '@shared/contract'
 import { defaultFeedFetcher, fetchFeedWithTimeout, type FeedFetcher } from '../collector/feedFetcher'
 import { parseHttpUrl } from '../httpUrl'
 import {
   deleteSource,
   insertSource,
   isFeedUrlRegistered,
+  type NewSource,
   setSourceEnabled as persistSourceEnabled
 } from '../repositories/sourceRepository'
 
@@ -59,6 +60,24 @@ export async function addSource(
     },
     (options.now ?? (() => new Date()))().toISOString()
   )
+}
+
+export function importSources(
+  database: Database.Database,
+  newSources: NewSource[],
+  createdAt: string
+): Omit<SourcesImportReport, 'rejectedCount'> {
+  const insertNewSources = database.transaction((): Omit<SourcesImportReport, 'rejectedCount'> => {
+    let importedCount = 0
+    for (const newSource of newSources) {
+      if (!isFeedUrlRegistered(database, newSource.feedUrl)) {
+        insertSource(database, newSource, createdAt)
+        importedCount += 1
+      }
+    }
+    return { importedCount, skippedCount: newSources.length - importedCount }
+  })
+  return insertNewSources()
 }
 
 export function setSourceEnabled(database: Database.Database, sourceId: number, isEnabled: boolean): void {

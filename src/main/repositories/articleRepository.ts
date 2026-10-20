@@ -1,6 +1,15 @@
 import type Database from 'better-sqlite3'
-import type { DigestArticle, FeedbackRating, FeedbackReason } from '@shared/contract'
+import type {
+  DigestArticle,
+  FeedbackRating,
+  FeedbackReason,
+  RecommendationMode,
+  RecommendationSignal
+} from '@shared/contract'
+import { findTopicById } from '../profile/topicCatalog'
 import { SOURCE_KEY_SELECT } from './sourceKeySql'
+
+export const SEARCH_RESULT_LIMIT = 50
 
 interface ArticleRow {
   id: number
@@ -14,6 +23,10 @@ interface ArticleRow {
   is_favorite: number
   is_read_later: number
   is_exploration: number
+  recommendation_mode: RecommendationMode | null
+  closest_topic_id: string | null
+  dominant_signal: RecommendationSignal | null
+  word_count: number | null
   rating: FeedbackRating | null
   reason: FeedbackReason | null
 }
@@ -26,6 +39,7 @@ export interface NewArticle {
   summary: string | null
   publishedAt: string
   fetchedAt: string
+  wordCount: number | null
 }
 
 export interface DigestCandidate {
@@ -36,16 +50,24 @@ export interface DigestCandidate {
   publishedAt: string
 }
 
+export interface StoredRecommendationReason {
+  mode: RecommendationMode | null
+  closestTopicId: string | null
+  dominantSignal: RecommendationSignal
+}
+
 export interface DigestSelection {
   articleId: number
   rank: number | null
   isExploration: boolean
+  recommendationReason?: StoredRecommendationReason
 }
 
 const ARTICLE_SELECT = `
   SELECT
     articles.id, articles.source_id, articles.title, articles.url, articles.summary, articles.source_name,
     articles.published_at, articles.read_at, articles.is_favorite, articles.is_read_later, articles.is_exploration,
+    articles.recommendation_mode, articles.closest_topic_id, articles.dominant_signal, articles.word_count,
     feedback.rating, feedback.reason
   FROM articles
   LEFT JOIN feedback ON feedback.article_id = articles.id
@@ -68,16 +90,37 @@ function mapArticleRow(articleRow: ArticleRow): DigestArticle {
     isFavorite: articleRow.is_favorite === 1,
     isReadLater: articleRow.is_read_later === 1,
     isExploration: articleRow.is_exploration === 1,
+    recommendationReason: articleRow.dominant_signal
+      ? {
+          mode: articleRow.recommendation_mode,
+          closestTopicLabel: articleRow.closest_topic_id
+            ? (findTopicById(articleRow.closest_topic_id)?.label ?? null)
+            : null,
+          dominantSignal: articleRow.dominant_signal
+        }
+      : null,
+    wordCount: articleRow.word_count,
     rating: articleRow.rating,
     feedbackReason: articleRow.reason
   }
 }
 
+export function buildFullTextQuery(rawQuery: string): string | null {
+  const searchTerms = rawQuery
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((searchTerm) => searchTerm.length > 0)
+  if (searchTerms.length === 0) {
+    return null
+  }
+  return searchTerms.map((searchTerm) => `"${searchTerm}"*`).join(' ')
+}
+
 export function insertArticleIfNew(database: Database.Database, newArticle: NewArticle): boolean {
   const insertResult = database
     .prepare(
-      `INSERT OR IGNORE INTO articles (source_id, source_name, url, title, summary, published_at, fetched_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT OR IGNORE INTO articles (source_id, source_name, url, title, summary, published_at, fetched_at, word_count)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       newArticle.sourceId,
@@ -86,7 +129,8 @@ export function insertArticleIfNew(database: Database.Database, newArticle: NewA
       newArticle.title,
       newArticle.summary,
       newArticle.publishedAt,
-      newArticle.fetchedAt
+      newArticle.fetchedAt,
+      newArticle.wordCount
     )
   return insertResult.changes > 0
 }
@@ -96,6 +140,14 @@ export function findArticleById(database: Database.Database, articleId: number):
     | ArticleRow
     | undefined
   return articleRow ? mapArticleRow(articleRow) : null
+}
+
+export function requireArticle(database: Database.Database, articleId: number): DigestArticle {
+  const article = findArticleById(database, articleId)
+  if (!article) {
+    throw new Error(`Article introuvable (id ${articleId}).`)
+  }
+  return article
 }
 
 export function listArticlesByDigestDate(database: Database.Database, digestDate: string): DigestArticle[] {
@@ -116,6 +168,23 @@ export function listFavoriteArticles(database: Database.Database): DigestArticle
   const articleRows = database
     .prepare(`${ARTICLE_SELECT} WHERE articles.is_favorite = 1 ${ARTICLE_ORDER}`)
     .all() as ArticleRow[]
+  return articleRows.map(mapArticleRow)
+}
+
+export function searchArticles(database: Database.Database, rawQuery: string): DigestArticle[] {
+  const fullTextQuery = buildFullTextQuery(rawQuery)
+  if (!fullTextQuery) {
+    return []
+  }
+  const articleRows = database
+    .prepare(
+      `${ARTICLE_SELECT}
+       JOIN articles_fts ON articles_fts.rowid = articles.id
+       WHERE articles_fts MATCH ?
+       ORDER BY bm25(articles_fts), articles.published_at DESC, articles.id DESC
+       LIMIT ?`
+    )
+    .all(fullTextQuery, SEARCH_RESULT_LIMIT) as ArticleRow[]
   return articleRows.map(mapArticleRow)
 }
 
@@ -152,7 +221,9 @@ export function assignDigestSelections(
   digestDate: string
 ): void {
   const assignStatement = database.prepare(
-    'UPDATE articles SET digest_date = ?, digest_rank = ?, is_exploration = ? WHERE id = ?'
+    `UPDATE articles
+     SET digest_date = ?, digest_rank = ?, is_exploration = ?, recommendation_mode = ?, closest_topic_id = ?, dominant_signal = ?
+     WHERE id = ?`
   )
   database.transaction(() => {
     for (const digestSelection of digestSelections) {
@@ -160,6 +231,9 @@ export function assignDigestSelections(
         digestDate,
         digestSelection.rank,
         digestSelection.isExploration ? 1 : 0,
+        digestSelection.recommendationReason?.mode ?? null,
+        digestSelection.recommendationReason?.closestTopicId ?? null,
+        digestSelection.recommendationReason?.dominantSignal ?? null,
         digestSelection.articleId
       )
     }
@@ -189,4 +263,8 @@ export function setArticleFavorite(database: Database.Database, articleId: numbe
 
 export function setArticleReadLater(database: Database.Database, articleId: number, isReadLater: boolean): void {
   database.prepare('UPDATE articles SET is_read_later = ? WHERE id = ?').run(isReadLater ? 1 : 0, articleId)
+}
+
+export function recordArticleWordCount(database: Database.Database, articleId: number, wordCount: number): void {
+  database.prepare('UPDATE articles SET word_count = ? WHERE id = ?').run(wordCount, articleId)
 }

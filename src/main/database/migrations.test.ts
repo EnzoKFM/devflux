@@ -17,12 +17,17 @@ describe('applyMigrations', () => {
       'app_settings',
       'article_embeddings',
       'articles',
+      'articles_fts',
+      'articles_fts_config',
+      'articles_fts_data',
+      'articles_fts_docsize',
+      'articles_fts_idx',
       'feedback',
       'sources',
       'topic_embeddings',
       'topic_preferences'
     ])
-    expect(database.pragma('user_version', { simple: true })).toBe(3)
+    expect(database.pragma('user_version', { simple: true })).toBe(4)
   })
 
   it('est idempotente', () => {
@@ -32,7 +37,7 @@ describe('applyMigrations', () => {
     applyMigrations(database)
     applyMigrations(database)
 
-    expect(database.pragma('user_version', { simple: true })).toBe(3)
+    expect(database.pragma('user_version', { simple: true })).toBe(4)
     expect(database.prepare('SELECT value FROM app_settings WHERE key = ?').get('cle')).toEqual({ value: 'valeur' })
   })
 
@@ -53,7 +58,7 @@ describe('applyMigrations', () => {
 
     applyMigrations(database)
 
-    expect(database.pragma('user_version', { simple: true })).toBe(3)
+    expect(database.pragma('user_version', { simple: true })).toBe(4)
     expect(database.prepare('SELECT title, digest_rank, is_exploration FROM articles').get()).toEqual({
       title: 'Article a',
       digest_rank: null,
@@ -96,6 +101,36 @@ describe('applyMigrations', () => {
       source_name: 'Smashing Magazine'
     })
     expect(database.prepare('SELECT COUNT(*) AS feedbackCount FROM feedback').get()).toEqual({ feedbackCount: 1 })
+  })
+
+  it('indexe les articles existants et reprend la dernière collecte réussie des sources', () => {
+    const database = new Database(':memory:')
+    database.pragma('foreign_keys = ON')
+    for (const migrationSql of MIGRATIONS.slice(0, 3)) {
+      database.exec(migrationSql)
+    }
+    database.pragma('user_version = 3')
+    const insertSourceStatement = database.prepare(
+      "INSERT INTO sources (name, feed_url, category, last_fetched_at, last_error, created_at) VALUES (?, ?, 'web', '2026-10-18T00:00:00.000Z', ?, '2026-10-01T00:00:00.000Z')"
+    )
+    insertSourceStatement.run('Blog sain', 'https://sain.example.com/feed.xml', null)
+    insertSourceStatement.run('Blog en panne', 'https://panne.example.com/feed.xml', 'Réponse HTTP 500')
+    database
+      .prepare(
+        `INSERT INTO articles (source_name, url, title, summary, published_at, fetched_at)
+         VALUES ('Blog sain', 'https://sain.example.com/a', 'Découvrir les générateurs', 'Résumé', '2026-10-18T00:00:00.000Z', '2026-10-18T00:00:00.000Z')`
+      )
+      .run()
+
+    applyMigrations(database)
+
+    expect(database.prepare('SELECT name, last_succeeded_at FROM sources ORDER BY name').all()).toEqual([
+      { name: 'Blog en panne', last_succeeded_at: null },
+      { name: 'Blog sain', last_succeeded_at: '2026-10-18T00:00:00.000Z' }
+    ])
+    expect(database.prepare("SELECT rowid FROM articles_fts WHERE articles_fts MATCH 'generateurs'").all()).toEqual([
+      { rowid: 1 }
+    ])
   })
 
   it('n ajoute aucune source à une base jamais initialisée', () => {

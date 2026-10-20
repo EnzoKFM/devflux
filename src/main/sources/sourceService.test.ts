@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createTestDatabase, FIXED_NOW } from '../testing/testHelpers'
 import { listSources } from '../repositories/sourceRepository'
-import { addSource, removeSource, setSourceEnabled } from './sourceService'
+import { addSource, importSources, removeSource, setSourceEnabled } from './sourceService'
 
 const validFetcher = async () => ({ title: ' Mon Blog ', link: 'https://blog.example.com', entries: [] })
 
@@ -63,5 +63,32 @@ describe('activation et suppression', () => {
 
     removeSource(database, source.id)
     expect(listSources(database)).toHaveLength(0)
+  })
+})
+
+describe('importSources', () => {
+  it('ajoute les nouvelles sources sans appel réseau et compte celles déjà présentes ou en double', () => {
+    const database = createTestDatabase()
+    importSources(
+      database,
+      [{ name: 'Existant', feedUrl: 'https://existant.example.com/feed', siteUrl: null, category: 'web' }],
+      FIXED_NOW.toISOString()
+    )
+
+    const importReport = importSources(
+      database,
+      [
+        { name: 'Existant', feedUrl: 'https://existant.example.com/feed', siteUrl: null, category: 'web' },
+        { name: 'Nouveau', feedUrl: 'https://nouveau.example.com/feed', siteUrl: 'https://nouveau.example.com/', category: 'software' },
+        { name: 'Nouveau bis', feedUrl: 'https://nouveau.example.com/feed', siteUrl: null, category: 'web' }
+      ],
+      FIXED_NOW.toISOString()
+    )
+
+    expect(importReport).toEqual({ importedCount: 1, skippedCount: 2 })
+    expect(listSources(database).map((source) => [source.name, source.category, source.isEnabled])).toEqual([
+      ['Nouveau', 'software', true],
+      ['Existant', 'web', true]
+    ])
   })
 })

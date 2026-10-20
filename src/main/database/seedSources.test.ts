@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import Database from 'better-sqlite3'
 import { createTestDatabase, FIXED_NOW } from '../testing/testHelpers'
 import { setSetting } from '../repositories/settingsRepository'
-import { insertSource, listSources } from '../repositories/sourceRepository'
+import { listSources } from '../repositories/sourceRepository'
 import { applyMigrations, MIGRATIONS } from './migrations'
 import { seedSourcesOnce, SOURCES_SEEDED_SETTING_KEY, type SeedSource } from './seedSources'
 import seedSourcesJson from './seedSources.json'
@@ -53,8 +53,17 @@ describe('seedSourcesOnce', () => {
     const retainedSeedSources = (seedSourcesJson as SeedSource[]).filter((seedSource) =>
       RETAINED_FRENCH_FEED_URLS.includes(seedSource.feedUrl)
     )
+    const insertVersionTwoSource = database.prepare(
+      'INSERT INTO sources (name, feed_url, site_url, category, created_at) VALUES (?, ?, ?, ?, ?)'
+    )
     for (const retainedSeedSource of retainedSeedSources) {
-      insertSource(database, retainedSeedSource, FIXED_NOW.toISOString())
+      insertVersionTwoSource.run(
+        retainedSeedSource.name,
+        retainedSeedSource.feedUrl,
+        retainedSeedSource.siteUrl,
+        retainedSeedSource.category,
+        FIXED_NOW.toISOString()
+      )
     }
     setSetting(database, PRE_FRENCH_SOURCES_SEEDED_SETTING_KEY, FIXED_NOW.toISOString())
     database.prepare('DELETE FROM sources WHERE feed_url = ?').run(DELETED_FEED_URL)

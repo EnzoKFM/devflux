@@ -36,6 +36,12 @@ Depuis un terminal intégré à VS Code, la variable `ELECTRON_RUN_AS_NODE=1` pe
   2. Collecte des sources actives : seuls les articles détectés en français sont enregistrés (voir **Langue**).
   3. Analyse : calcul des embeddings des nouveaux articles et des sujets (voir **Recommandation locale**).
   4. Sélection des 20 articles, avec au plus 4 articles par source.
+- **Notification** : quand une préparation avec collecte aboutit alors que la fenêtre n'a pas le focus, une notification système « Votre fil du jour est prêt » indique le nombre d'articles sélectionnés et, à part, le nombre de nouveaux articles collectés ; un clic ramène la fenêtre.
+- **Pourquoi cet article ?** : chaque carte du fil explique sa sélection (mode de recommandation, y compris `cold-start` et `unavailable` pour le tourniquet, sujet du catalogue le plus proche si la similarité atteint 0,35, signal dominant du score). Le signal dominant est la plus forte contribution au score : poids × valeur standardisée en mode `trained`, termes pondérés du score en mode `similarity`.
+- **Temps de lecture** : estimé à 230 mots par minute à partir du contenu complet du flux (`content:encoded` en RSS, `content` en Atom), sinon du résumé ; affiché seulement à partir de 150 mots. L'ouverture de l'article dans le lecteur remplace l'estimation par le nombre de mots du contenu extrait, s'il atteint lui aussi 150 mots.
+- **Articles lus** : ouvrir un article le marque comme lu ; sa carte est alors atténuée dans les listes et retrouve son plein contraste au survol ou au focus clavier.
+- **Recherche** : vue **Recherche**, plein texte (SQLite FTS5) sur le titre, le résumé et le nom de la source de tous les articles conservés, insensible à la casse et aux accents ; chaque mot est cherché comme préfixe et tous doivent être présents ; 50 résultats au plus, triés par pertinence puis du plus récent au plus ancien.
+- **Export des favoris** : bouton « Exporter en Markdown » de la vue **Favoris** (liste de liens avec source, date et résumé).
 - **Articles vus** : un article affiché dans un fil n'est jamais reproposé. Le bouton « Plus tard » permet de le garder.
 - **Notes** : les 👍 / 👎 et leur raison sont conservés dans la table `feedback` et pris en compte dès le fil du lendemain.
 - **Premier lancement** : choix des sujets suivis, modifiables ensuite dans **Mon profil** (Suivi / Neutre / Masqué).
@@ -47,6 +53,11 @@ Depuis un terminal intégré à VS Code, la variable `ELECTRON_RUN_AS_NODE=1` pe
 
 - **Français uniquement** : un article n'est retenu que si son titre et son résumé contiennent au moins deux mots outils français, et plus de mots outils français que de mots outils anglais, espagnols, portugais, italiens ou allemands. Le filtre s'applique à la collecte et à la sélection du fil.
 - **Sources de départ** : 20 flux français (dev, sécurité, IA). La migration 3 supprime les anciennes sources anglophones (leurs articles et leurs notes sont conservés) et ajoute les nouveaux flux français aux bases existantes. Une source anglophone ajoutée à la main n'apporte aucun article.
+
+## Sources
+
+- **Santé** : chaque source active affiche sa dernière collecte réussie et, si elle en a une, le nombre d'articles retenus sur les 7 derniers jours. Une source est signalée en erreur si sa dernière collecte a échoué, muette si elle n'a apporté aucun article depuis 7 jours (hors sources ajoutées depuis moins de 7 jours), en attente tant qu'elle n'a jamais été collectée avec succès.
+- **OPML** : export de toutes les sources ; import d'un fichier de 5 Mo au plus, sans vérification réseau des flux. Les flux déjà présents ou en double dans le fichier sont ignorés, les adresses non http(s) écartées, et le compte rendu de l'import indique chacun de ces nombres ; une catégorie absente ou inconnue devient `general`.
 
 ## Recommandation locale
 
@@ -71,4 +82,6 @@ Depuis un terminal intégré à VS Code, la variable `ELECTRON_RUN_AS_NODE=1` pe
 | `src/preload/` | Pont `window.devflux` |
 | `src/renderer/` | Interface React (Tailwind) ; le contenu des articles est assaini avec DOMPurify |
 | `src/main/database/seedSources.json` | Sources de départ, insérées au premier lancement ; les bases existantes reçoivent les nouveaux flux via la migration 3 |
+| `src/main/database/migrations.ts` | Migration 4 : index plein texte `articles_fts` (FTS5, tenu à jour par triggers), dernière collecte réussie des sources, explication de la sélection et nombre de mots des articles |
+| `src/main/sources/opml.ts`, `src/main/exports/` | Import et export OPML, export Markdown des favoris |
 | `resources/icon.svg`, `resources/icon.png` | Logo (source SVG et PNG 512 px), icône de l'AppImage, de la fenêtre et du lanceur |

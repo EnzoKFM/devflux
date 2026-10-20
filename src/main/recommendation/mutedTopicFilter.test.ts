@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { StoredTopicPreference } from '../repositories/topicPreferenceRepository'
-import { isArticleOfMutedTopic, MUTED_TOPIC_MIN_SIMILARITY } from './mutedTopicFilter'
+import { TOPIC_MATCH_MIN_SIMILARITY } from './closestTopic'
+import { isArticleOfMutedTopic } from './mutedTopicFilter'
 
 const topicVectors = new Map<string, Float32Array>([
   ['php', new Float32Array([1, 0, 0])],
@@ -17,7 +18,7 @@ describe('isArticleOfMutedTopic', () => {
     expect(isArticleOfMutedTopic(new Float32Array([0.5, 0.8, 0]), topicVectors, topicPreferences)).toBe(false)
   })
 
-  it(`garde un article trop éloigné du sujet masqué (similarité < ${MUTED_TOPIC_MIN_SIMILARITY})`, () => {
+  it(`garde un article trop éloigné du sujet masqué (similarité < ${TOPIC_MATCH_MIN_SIMILARITY})`, () => {
     expect(isArticleOfMutedTopic(new Float32Array([0.3, 0.1, 1]), topicVectors, topicPreferences)).toBe(false)
   })
 

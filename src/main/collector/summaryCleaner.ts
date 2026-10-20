@@ -24,14 +24,18 @@ function decodeEntities(text: string): string {
   })
 }
 
-export function cleanSummary(rawSummary: string | undefined): string | null {
-  if (!rawSummary) {
-    return null
+export function extractPlainText(rawHtml: string | undefined): string {
+  if (!rawHtml) {
+    return ''
   }
-  const withoutTags = rawSummary
+  const withoutTags = rawHtml
     .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
     .replace(/<[^>]*>/g, ' ')
-  const compactSummary = decodeEntities(withoutTags).replace(/\s+/g, ' ').trim()
+  return decodeEntities(withoutTags).replace(/\s+/g, ' ').trim()
+}
+
+export function cleanSummary(rawSummary: string | undefined): string | null {
+  const compactSummary = extractPlainText(rawSummary)
   if (compactSummary.length === 0) {
     return null
   }

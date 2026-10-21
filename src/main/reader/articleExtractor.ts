@@ -1,6 +1,7 @@
 import { Readability } from '@mozilla/readability'
 import { parseHTML } from 'linkedom'
 import type { ArticleContent } from '@shared/contract'
+import { decodeResponseText, HTML_META_CHARSET_PATTERN } from '../textDecoding'
 
 export const ARTICLE_FETCH_TIMEOUT_IN_MS = 20_000
 export const ARTICLE_USER_AGENT = 'DevFlux/0.1'
@@ -52,7 +53,7 @@ async function fetchPageHtml(
   if (!response.ok) {
     throw new Error(`Réponse HTTP ${response.status}`)
   }
-  const html = await response.text()
+  const html = await decodeResponseText(response, HTML_META_CHARSET_PATTERN)
   return { html, finalUrl: response.url || pageUrl }
 }
 

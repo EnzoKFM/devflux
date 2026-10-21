@@ -33,7 +33,7 @@ Depuis un terminal intégré à VS Code, la variable `ELECTRON_RUN_AS_NODE=1` pe
 - **Au lancement** : le fil du jour n'est construit qu'une fois par jour. Les lancements suivants du même jour réaffichent le même fil sans nouvelle collecte.
 - **Préparation** :
   1. Purge des articles de plus de 14 jours, sauf les favoris, les « plus tard » et les articles notés.
-  2. Collecte des sources actives : seuls les articles détectés en français sont enregistrés (voir **Langue**).
+  2. Collecte des sources actives : seuls les articles détectés en français sont enregistrés, après vérification de leur page (voir **Langue**).
   3. Analyse : calcul des embeddings des nouveaux articles et des sujets (voir **Recommandation locale**).
   4. Sélection des 20 articles, avec au plus 4 articles par source.
 - **Notification** : quand une préparation avec collecte aboutit alors que la fenêtre n'a pas le focus, une notification système « Votre fil du jour est prêt » indique le nombre d'articles sélectionnés et, à part, le nombre de nouveaux articles collectés ; un clic ramène la fenêtre.
@@ -52,6 +52,8 @@ Depuis un terminal intégré à VS Code, la variable `ELECTRON_RUN_AS_NODE=1` pe
 ## Langue
 
 - **Français uniquement** : un article n'est retenu que si son titre et son résumé contiennent au moins deux mots outils français, et plus de mots outils français que de mots outils anglais, espagnols, portugais, italiens ou allemands. Le filtre s'applique à la collecte et à la sélection du fil.
+- **Vérification de la page** : à la collecte, chaque nouvel article qui passe ce filtre est téléchargé (4 pages à la fois par source) et le texte extrait de sa page doit lui aussi être détecté en français. Une page illisible (ex. HTTP 403) ou non française n'est pas enregistrée ; l'article est retenté à la collecte suivante tant qu'il reste dans le flux. Un article déjà enregistré dont le titre ou le résumé a changé dans le flux de sa source est mis à jour (sans nouveau téléchargement) et son embedding est recalculé.
+- **Encodage** : flux et pages sont décodés selon le `charset` de l'en-tête HTTP, sinon la déclaration `encoding` du flux XML ou la balise `<meta>` de la page, sinon UTF-8 (ISO-8859-1 et ISO-8859-15 compris).
 - **Sources de départ** : 20 flux français (dev, sécurité, IA). La migration 3 supprime les anciennes sources anglophones (leurs articles et leurs notes sont conservés) et ajoute les nouveaux flux français aux bases existantes. Une source anglophone ajoutée à la main n'apporte aucun article.
 
 ## Sources

@@ -1,7 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { addTestSource, buildEntry, createFeedFetcher, createTestDatabase, daysBefore, FIXED_NOW } from '../testing/testHelpers'
+import {
+  addTestSource,
+  buildEntry,
+  createFeedFetcher,
+  createHtmlResponse,
+  createPageFetcher,
+  createTestDatabase,
+  daysBefore,
+  ENGLISH_PAGE_PARAGRAPH,
+  fetchFrenchPage,
+  FIXED_NOW,
+  FRENCH_PAGE_PARAGRAPH,
+  insertTestArticle
+} from '../testing/testHelpers'
 import { listSources } from '../repositories/sourceRepository'
-import { collectFeeds } from './feedCollector'
+import { collectFeeds, PAGE_VERIFICATION_CONCURRENCY } from './feedCollector'
 
 function readArticles(database: ReturnType<typeof createTestDatabase>) {
   return database
@@ -25,7 +38,7 @@ describe('collectFeeds', () => {
       }
     })
 
-    const result = await collectFeeds(database, { fetchFeed, now: () => FIXED_NOW })
+    const result = await collectFeeds(database, { fetchFeed, fetchPage: fetchFrenchPage, now: () => FIXED_NOW })
 
     expect(readArticles(database).map((article) => article.url)).toEqual([
       'https://blog.example.com/limite',
@@ -57,7 +70,7 @@ describe('collectFeeds', () => {
       }
     })
 
-    const result = await collectFeeds(database, { fetchFeed, now: () => FIXED_NOW })
+    const result = await collectFeeds(database, { fetchFeed, fetchPage: fetchFrenchPage, now: () => FIXED_NOW })
 
     expect(readArticles(database).map((article) => article.url)).toEqual(['https://blog.example.com/francais'])
     expect(result.newArticleCount).toBe(1)
@@ -70,7 +83,7 @@ describe('collectFeeds', () => {
       'https://blog-un.example.com/feed.xml': { entries: [buildEntry('futur', '2026-12-25T00:00:00.000Z')] }
     })
 
-    await collectFeeds(database, { fetchFeed, now: () => FIXED_NOW })
+    await collectFeeds(database, { fetchFeed, fetchPage: fetchFrenchPage, now: () => FIXED_NOW })
 
     expect(readArticles(database)[0].published_at).toBe(FIXED_NOW.toISOString())
   })
@@ -92,8 +105,8 @@ describe('collectFeeds', () => {
       }
     })
 
-    const firstResult = await collectFeeds(database, { fetchFeed, now: () => FIXED_NOW })
-    const secondResult = await collectFeeds(database, { fetchFeed, now: () => FIXED_NOW })
+    const firstResult = await collectFeeds(database, { fetchFeed, fetchPage: fetchFrenchPage, now: () => FIXED_NOW })
+    const secondResult = await collectFeeds(database, { fetchFeed, fetchPage: fetchFrenchPage, now: () => FIXED_NOW })
 
     expect(readArticles(database)).toHaveLength(1)
     expect(firstResult.newArticleCount).toBe(1)
@@ -109,7 +122,7 @@ describe('collectFeeds', () => {
       }
     })
 
-    await collectFeeds(database, { fetchFeed, now: () => FIXED_NOW })
+    await collectFeeds(database, { fetchFeed, fetchPage: fetchFrenchPage, now: () => FIXED_NOW })
 
     expect(readArticles(database)[0]).toMatchObject({ source_name: 'Blog Un', summary: 'Bonjour monde' })
   })
@@ -128,6 +141,7 @@ describe('collectFeeds', () => {
 
     const result = await collectFeeds(database, {
       fetchFeed,
+      fetchPage: fetchFrenchPage,
       now: () => FIXED_NOW,
       onSourceProcessed: (completedSourceCount) => progressCounts.push(completedSourceCount)
     })
@@ -195,11 +209,189 @@ describe('collectFeeds', () => {
       }
     })
 
-    await collectFeeds(database, { fetchFeed, now: () => FIXED_NOW })
+    await collectFeeds(database, { fetchFeed, fetchPage: fetchFrenchPage, now: () => FIXED_NOW })
 
     expect(database.prepare('SELECT url, word_count FROM articles ORDER BY url').all()).toEqual([
       { url: 'https://blog.example.com/complet', word_count: 360 },
       { url: 'https://blog.example.com/extrait', word_count: null }
     ])
+  })
+
+  it('n enregistre pas un article au titre français dont la page est rédigée dans une autre langue', async () => {
+    const database = createTestDatabase()
+    addTestSource(database, 'Blog Un')
+    const publishedAt = daysBefore(FIXED_NOW, 1)
+    const fetchFeed = createFeedFetcher({
+      'https://blog-un.example.com/feed.xml': {
+        entries: [buildEntry('page-francaise', publishedAt), buildEntry('page-anglaise', publishedAt)]
+      }
+    })
+    const fetchPage = createPageFetcher({
+      'https://blog.example.com/page-francaise': () => createHtmlResponse(FRENCH_PAGE_PARAGRAPH),
+      'https://blog.example.com/page-anglaise': () => createHtmlResponse(ENGLISH_PAGE_PARAGRAPH)
+    })
+
+    const result = await collectFeeds(database, { fetchFeed, fetchPage, now: () => FIXED_NOW })
+
+    expect(readArticles(database).map((article) => article.url)).toEqual(['https://blog.example.com/page-francaise'])
+    expect(result.newArticleCount).toBe(1)
+  })
+
+  it('n enregistre pas un article dont la page est illisible puis l enregistre à la collecte où elle répond', async () => {
+    const database = createTestDatabase()
+    addTestSource(database, 'Blog Un')
+    const fetchFeed = createFeedFetcher({
+      'https://blog-un.example.com/feed.xml': { entries: [buildEntry('page-interdite', daysBefore(FIXED_NOW, 1))] }
+    })
+    let isPageAvailable = false
+    const fetchPage = async () =>
+      isPageAvailable ? createHtmlResponse(FRENCH_PAGE_PARAGRAPH) : new Response('Interdit', { status: 403 })
+
+    const firstResult = await collectFeeds(database, { fetchFeed, fetchPage, now: () => FIXED_NOW })
+    const articleCountAfterFirstCollection = readArticles(database).length
+    isPageAvailable = true
+    const secondResult = await collectFeeds(database, { fetchFeed, fetchPage, now: () => FIXED_NOW })
+
+    expect(articleCountAfterFirstCollection).toBe(0)
+    expect(firstResult.newArticleCount).toBe(0)
+    expect(readArticles(database).map((article) => article.url)).toEqual(['https://blog.example.com/page-interdite'])
+    expect(secondResult.newArticleCount).toBe(1)
+  })
+
+  it('corrige le titre et le résumé d un article déjà enregistré, supprime son embedding et ne télécharge pas sa page', async () => {
+    const database = createTestDatabase()
+    const sourceId = addTestSource(database, 'Blog Un')
+    const articleId = insertTestArticle(database, {
+      sourceId,
+      slug: 'abime',
+      title: 'Cybers\uFFFDcurit\uFFFD : les infrastructures critiques fran\uFFFDaises',
+      publishedAt: daysBefore(FIXED_NOW, 1)
+    })
+    database
+      .prepare("INSERT INTO article_embeddings (article_id, model_id, vector) VALUES (?, 'modele', x'00')")
+      .run(articleId)
+    const fetchFeed = createFeedFetcher({
+      'https://blog-un.example.com/feed.xml': {
+        entries: [
+          buildEntry('abime', daysBefore(FIXED_NOW, 1), {
+            title: 'Cybersécurité : les infrastructures critiques françaises',
+            description: 'Un état des lieux pour les équipes'
+          })
+        ]
+      }
+    })
+    const requestedPageUrls: string[] = []
+
+    const result = await collectFeeds(database, {
+      fetchFeed,
+      fetchPage: async (pageUrl) => {
+        requestedPageUrls.push(pageUrl)
+        return createHtmlResponse(FRENCH_PAGE_PARAGRAPH)
+      },
+      now: () => FIXED_NOW
+    })
+
+    expect(readArticles(database)).toMatchObject([
+      {
+        url: 'https://blog.example.com/abime',
+        title: 'Cybersécurité : les infrastructures critiques françaises',
+        summary: 'Un état des lieux pour les équipes'
+      }
+    ])
+    expect(database.prepare('SELECT COUNT(*) AS embeddingCount FROM article_embeddings').get()).toEqual({
+      embeddingCount: 0
+    })
+    expect(requestedPageUrls).toEqual([])
+    expect(result.newArticleCount).toBe(0)
+  })
+
+  it('ne modifie pas un article enregistré par une autre source, ni son embedding', async () => {
+    const database = createTestDatabase()
+    const owningSourceId = addTestSource(database, 'Blog Un')
+    addTestSource(database, 'Blog Deux')
+    const articleId = insertTestArticle(database, {
+      sourceId: owningSourceId,
+      slug: 'partage',
+      publishedAt: daysBefore(FIXED_NOW, 1)
+    })
+    database
+      .prepare("INSERT INTO article_embeddings (article_id, model_id, vector) VALUES (?, 'modele', x'00')")
+      .run(articleId)
+    const fetchFeed = createFeedFetcher({
+      'https://blog-un.example.com/feed.xml': { entries: [] },
+      'https://blog-deux.example.com/feed.xml': {
+        entries: [
+          buildEntry('partage', daysBefore(FIXED_NOW, 1), {
+            title: 'Un autre titre pour les lecteurs de la seconde source',
+            description: 'Un autre résumé pour les lecteurs'
+          })
+        ]
+      }
+    })
+
+    await collectFeeds(database, { fetchFeed, fetchPage: fetchFrenchPage, now: () => FIXED_NOW })
+
+    expect(readArticles(database)).toMatchObject([
+      { url: 'https://blog.example.com/partage', title: 'Le point de la semaine sur partage', summary: null }
+    ])
+    expect(database.prepare('SELECT COUNT(*) AS embeddingCount FROM article_embeddings').get()).toEqual({
+      embeddingCount: 1
+    })
+  })
+
+  it('met à jour un article enregistré dont seul le résumé a changé et supprime son embedding', async () => {
+    const database = createTestDatabase()
+    const sourceId = addTestSource(database, 'Blog Un')
+    const articleId = insertTestArticle(database, {
+      sourceId,
+      slug: 'resume',
+      publishedAt: daysBefore(FIXED_NOW, 1)
+    })
+    database.prepare("UPDATE articles SET summary = 'Ancien résumé' WHERE id = ?").run(articleId)
+    database
+      .prepare("INSERT INTO article_embeddings (article_id, model_id, vector) VALUES (?, 'modele', x'00')")
+      .run(articleId)
+    const fetchFeed = createFeedFetcher({
+      'https://blog-un.example.com/feed.xml': {
+        entries: [buildEntry('resume', daysBefore(FIXED_NOW, 1), { description: 'Nouveau résumé' })]
+      }
+    })
+
+    await collectFeeds(database, { fetchFeed, fetchPage: fetchFrenchPage, now: () => FIXED_NOW })
+
+    expect(readArticles(database)).toMatchObject([
+      { title: 'Le point de la semaine sur resume', summary: 'Nouveau résumé' }
+    ])
+    expect(database.prepare('SELECT COUNT(*) AS embeddingCount FROM article_embeddings').get()).toEqual({
+      embeddingCount: 0
+    })
+  })
+
+  it(`vérifie au plus ${PAGE_VERIFICATION_CONCURRENCY} pages à la fois`, async () => {
+    const database = createTestDatabase()
+    addTestSource(database, 'Blog Un')
+    const publishedAt = daysBefore(FIXED_NOW, 1)
+    const fetchFeed = createFeedFetcher({
+      'https://blog-un.example.com/feed.xml': {
+        entries: Array.from({ length: 10 }, (_entry, entryIndex) => buildEntry(`page-${entryIndex}`, publishedAt))
+      }
+    })
+    let runningFetchCount = 0
+    let maxRunningFetchCount = 0
+
+    await collectFeeds(database, {
+      fetchFeed,
+      fetchPage: async () => {
+        runningFetchCount += 1
+        maxRunningFetchCount = Math.max(maxRunningFetchCount, runningFetchCount)
+        await new Promise((resolve) => setTimeout(resolve, 5))
+        runningFetchCount -= 1
+        return createHtmlResponse(FRENCH_PAGE_PARAGRAPH)
+      },
+      now: () => FIXED_NOW
+    })
+
+    expect(readArticles(database)).toHaveLength(10)
+    expect(maxRunningFetchCount).toBe(PAGE_VERIFICATION_CONCURRENCY)
   })
 })

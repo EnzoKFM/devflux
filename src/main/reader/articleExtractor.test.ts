@@ -34,4 +34,19 @@ describe('extractArticleContent', () => {
     expect(content.contentHtml).toBeNull()
     expect(content.title).toBe('Titre en base')
   })
+
+  it('décode une page ISO-8859-1 annoncée par sa balise meta charset, sans charset dans l en-tête HTTP', async () => {
+    const pageHtml = PAGE_HTML.replace('<head>', '<head><meta charset="iso-8859-1">').replace(
+      'Un second paragraphe tout aussi long pour le contenu principal. ',
+      'Cybersécurité : les infrastructures critiques françaises. '
+    )
+
+    const content = await extractArticleContent(
+      ARTICLE_REFERENCE,
+      async () => new Response(Buffer.from(pageHtml, 'latin1'), { status: 200, headers: { 'Content-Type': 'text/html' } })
+    )
+
+    expect(content.contentHtml).toContain('Cybersécurité : les infrastructures critiques françaises.')
+    expect(content.contentHtml).not.toContain('\uFFFD')
+  })
 })

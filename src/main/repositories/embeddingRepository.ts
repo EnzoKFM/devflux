@@ -27,6 +27,10 @@ export function saveArticleEmbeddings(
   })()
 }
 
+export function deleteArticleEmbedding(database: Database.Database, articleId: number): void {
+  database.prepare('DELETE FROM article_embeddings WHERE article_id = ?').run(articleId)
+}
+
 export function loadArticleVectors(database: Database.Database, modelId: string): Map<number, Float32Array> {
   const vectorRows = database
     .prepare('SELECT article_id, vector FROM article_embeddings WHERE model_id = ?')

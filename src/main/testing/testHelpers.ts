@@ -3,6 +3,7 @@ import type { FeedData, FeedEntry } from '@extractus/feed-extractor'
 import type { FeedbackReason, SourceCategory } from '@shared/contract'
 import { applyMigrations } from '../database/migrations'
 import type { FeedFetcher } from '../collector/feedFetcher'
+import type { PageFetcher } from '../reader/articleExtractor'
 import type { EmbedOptions, EmbeddingProvider } from '../recommendation/embeddingProvider'
 import { insertSource } from '../repositories/sourceRepository'
 
@@ -52,6 +53,33 @@ export function createFeedFetcher(feedsByUrl: Record<string, FeedData | Error>):
       throw feedOrError
     }
     return feedOrError
+  }
+}
+
+export function buildPageHtml(paragraph: string): string {
+  return `<!DOCTYPE html><html><head><title>Page de test</title></head><body>
+<article><h1>Page de test</h1>
+<p>${paragraph.repeat(12)}</p>
+<p>${paragraph.repeat(12)}</p>
+</article></body></html>`
+}
+
+export const FRENCH_PAGE_PARAGRAPH = 'Cette page est rédigée pour les lecteurs francophones qui suivent le sujet dans le détail. '
+export const ENGLISH_PAGE_PARAGRAPH = 'This page is written for the readers that follow the topic with all of the details. '
+
+export function createHtmlResponse(paragraph: string): Response {
+  return new Response(buildPageHtml(paragraph), { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } })
+}
+
+export const fetchFrenchPage: PageFetcher = async () => createHtmlResponse(FRENCH_PAGE_PARAGRAPH)
+
+export function createPageFetcher(responsesByUrl: Record<string, () => Response>): PageFetcher {
+  return async (pageUrl) => {
+    const createResponse = responsesByUrl[pageUrl]
+    if (createResponse === undefined) {
+      throw new Error(`Page inconnue ${pageUrl}`)
+    }
+    return createResponse()
   }
 }
 

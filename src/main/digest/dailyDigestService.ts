@@ -3,6 +3,7 @@ import { DAILY_DIGEST_SIZE, type DailyDigest, type PreparationProgress, type Rec
 import { computeOldestAllowedPublicationDate } from '../collector/articleAge'
 import { collectFeeds } from '../collector/feedCollector'
 import type { FeedFetcher } from '../collector/feedFetcher'
+import type { PageFetcher } from '../reader/articleExtractor'
 import type { EmbeddingProvider } from '../recommendation/embeddingProvider'
 import { resolveEmbeddingModelId } from '../recommendation/embeddingStep'
 import { isFrenchArticle } from '../recommendation/languageDetection'
@@ -24,6 +25,7 @@ import { listEnabledSources } from '../repositories/sourceRepository'
 
 export interface PrepareDailyDigestOptions {
   fetchFeed?: FeedFetcher
+  fetchPage?: PageFetcher
   embeddingProvider?: EmbeddingProvider
   random?: () => number
   now?: () => Date
@@ -107,6 +109,7 @@ export async function prepareDailyDigest(
   reportProgress('collecting', 0)
   const collectionResult = await collectFeeds(database, {
     fetchFeed: options.fetchFeed,
+    fetchPage: options.fetchPage,
     now,
     onSourceProcessed: (completedSourceCount) => reportProgress('collecting', completedSourceCount)
   })

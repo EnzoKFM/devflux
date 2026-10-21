@@ -8,6 +8,7 @@ import {
   createTestDatabase,
   daysBefore,
   FIXED_NOW,
+  fetchFrenchPage,
   insertTestArticle
 } from '../testing/testHelpers'
 import { getUserProfile } from '../profile/profileService'
@@ -32,8 +33,8 @@ describe('prepareDailyDigest', () => {
       return { entries: [buildEntry('a', daysBefore(FIXED_NOW, 1)), buildEntry('b', daysBefore(FIXED_NOW, 2))] }
     }
 
-    const firstDigest = await prepareDailyDigest(database, { fetchFeed, now: () => FIXED_NOW })
-    const secondDigest = await prepareDailyDigest(database, { fetchFeed, now: () => FIXED_NOW })
+    const firstDigest = await prepareDailyDigest(database, { fetchFeed, fetchPage: fetchFrenchPage, now: () => FIXED_NOW })
+    const secondDigest = await prepareDailyDigest(database, { fetchFeed, fetchPage: fetchFrenchPage, now: () => FIXED_NOW })
 
     expect(fetchCount).toBe(1)
     expect(firstDigest.collectionReport).toMatchObject({ succeededSourceCount: 1, failedSourceCount: 0, newArticleCount: 2 })
@@ -50,8 +51,8 @@ describe('prepareDailyDigest', () => {
     })
     const nextDay = new Date(FIXED_NOW.getTime() + 24 * 60 * 60 * 1000)
 
-    const firstDigest = await prepareDailyDigest(database, { fetchFeed, now: () => FIXED_NOW })
-    const secondDigest = await prepareDailyDigest(database, { fetchFeed, now: () => nextDay })
+    const firstDigest = await prepareDailyDigest(database, { fetchFeed, fetchPage: fetchFrenchPage, now: () => FIXED_NOW })
+    const secondDigest = await prepareDailyDigest(database, { fetchFeed, fetchPage: fetchFrenchPage, now: () => nextDay })
 
     expect(firstDigest.articles).toHaveLength(2)
     expect(secondDigest.articles).toHaveLength(0)
@@ -241,7 +242,7 @@ describe('intégration collecte et fil', () => {
       'https://blog-casse.example.com/feed.xml': new Error('panne')
     })
 
-    const digest = await prepareDailyDigest(database, { fetchFeed, now: () => FIXED_NOW })
+    const digest = await prepareDailyDigest(database, { fetchFeed, fetchPage: fetchFrenchPage, now: () => FIXED_NOW })
 
     expect(digest.collectionReport).toEqual({
       succeededSourceCount: 1,

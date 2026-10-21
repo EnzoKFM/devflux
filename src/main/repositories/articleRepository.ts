@@ -42,6 +42,13 @@ export interface NewArticle {
   wordCount: number | null
 }
 
+export interface StoredArticleText {
+  id: number
+  sourceId: number | null
+  title: string
+  summary: string | null
+}
+
 export interface DigestCandidate {
   id: number
   sourceKey: string
@@ -133,6 +140,24 @@ export function insertArticleIfNew(database: Database.Database, newArticle: NewA
       newArticle.wordCount
     )
   return insertResult.changes > 0
+}
+
+export function findStoredArticleTextByUrl(database: Database.Database, url: string): StoredArticleText | null {
+  const articleRow = database
+    .prepare('SELECT id, source_id, title, summary FROM articles WHERE url = ?')
+    .get(url) as { id: number; source_id: number | null; title: string; summary: string | null } | undefined
+  return articleRow
+    ? { id: articleRow.id, sourceId: articleRow.source_id, title: articleRow.title, summary: articleRow.summary }
+    : null
+}
+
+export function updateArticleText(
+  database: Database.Database,
+  articleId: number,
+  title: string,
+  summary: string | null
+): void {
+  database.prepare('UPDATE articles SET title = ?, summary = ? WHERE id = ?').run(title, summary, articleId)
 }
 
 export function findArticleById(database: Database.Database, articleId: number): DigestArticle | null {

@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3'
 import { describe, expect, it } from 'vitest'
+import { FEEDBACK_REASONS } from '@shared/contract'
 import { createTestDatabase } from '../testing/testHelpers'
 import { applyMigrations, MIGRATIONS } from './migrations'
 
@@ -27,7 +28,7 @@ describe('applyMigrations', () => {
       'topic_embeddings',
       'topic_preferences'
     ])
-    expect(database.pragma('user_version', { simple: true })).toBe(4)
+    expect(database.pragma('user_version', { simple: true })).toBe(5)
   })
 
   it('est idempotente', () => {
@@ -37,7 +38,7 @@ describe('applyMigrations', () => {
     applyMigrations(database)
     applyMigrations(database)
 
-    expect(database.pragma('user_version', { simple: true })).toBe(4)
+    expect(database.pragma('user_version', { simple: true })).toBe(5)
     expect(database.prepare('SELECT value FROM app_settings WHERE key = ?').get('cle')).toEqual({ value: 'valeur' })
   })
 
@@ -58,7 +59,7 @@ describe('applyMigrations', () => {
 
     applyMigrations(database)
 
-    expect(database.pragma('user_version', { simple: true })).toBe(4)
+    expect(database.pragma('user_version', { simple: true })).toBe(5)
     expect(database.prepare('SELECT title, digest_rank, is_exploration FROM articles').get()).toEqual({
       title: 'Article a',
       digest_rank: null,
@@ -131,6 +132,64 @@ describe('applyMigrations', () => {
     expect(database.prepare("SELECT rowid FROM articles_fts WHERE articles_fts MATCH 'generateurs'").all()).toEqual([
       { rowid: 1 }
     ])
+  })
+
+  it('conserve les notes existantes et accepte les nouvelles raisons de 👎', () => {
+    const database = new Database(':memory:')
+    database.pragma('foreign_keys = ON')
+    for (const migrationSql of MIGRATIONS.slice(0, 4)) {
+      database.exec(migrationSql)
+    }
+    database.pragma('user_version = 4')
+    const insertArticleStatement = database.prepare(
+      `INSERT INTO articles (id, source_name, url, title, published_at, fetched_at, digest_date)
+       VALUES (?, 'Blog', ?, 'Article', '2026-10-18T00:00:00.000Z', '2026-10-18T00:00:00.000Z', '2026-10-18')`
+    )
+    insertArticleStatement.run(1, 'https://blog.example.com/a')
+    insertArticleStatement.run(2, 'https://blog.example.com/b')
+    database
+      .prepare("INSERT INTO feedback (article_id, rating, reason, created_at) VALUES (1, 'dislike', 'bad-source', '2026-10-18T00:00:00.000Z')")
+      .run()
+
+    applyMigrations(database)
+
+    expect(database.prepare('SELECT article_id, rating, reason FROM feedback').all()).toEqual([
+      { article_id: 1, rating: 'dislike', reason: 'bad-source' }
+    ])
+    expect(() =>
+      database
+        .prepare("INSERT INTO feedback (article_id, rating, reason, created_at) VALUES (2, 'dislike', 'not-french', '2026-10-18T00:00:00.000Z')")
+        .run()
+    ).not.toThrow()
+    expect(() =>
+      database
+        .prepare("UPDATE feedback SET reason = 'raison-inconnue' WHERE article_id = 2")
+        .run()
+    ).toThrow()
+    expect(database.prepare('SELECT is_digest_replaced FROM articles ORDER BY id').all()).toEqual([
+      { is_digest_replaced: 0 },
+      { is_digest_replaced: 0 }
+    ])
+    database.prepare('DELETE FROM articles WHERE id = 1').run()
+    expect(database.prepare('SELECT COUNT(*) AS feedbackCount FROM feedback WHERE article_id = 1').get()).toEqual({
+      feedbackCount: 0
+    })
+  })
+
+  it('accepte en base chaque raison de 👎 du contrat', () => {
+    const database = createTestDatabase()
+    const insertArticleStatement = database.prepare(
+      `INSERT INTO articles (source_name, url, title, published_at, fetched_at)
+       VALUES ('Blog', ?, 'Article', '2026-10-18T00:00:00.000Z', '2026-10-18T00:00:00.000Z')`
+    )
+    const insertFeedbackStatement = database.prepare(
+      "INSERT INTO feedback (article_id, rating, reason, created_at) VALUES (?, 'dislike', ?, '2026-10-18T00:00:00.000Z')"
+    )
+
+    for (const feedbackReason of FEEDBACK_REASONS) {
+      const articleId = Number(insertArticleStatement.run(`https://blog.example.com/${feedbackReason}`).lastInsertRowid)
+      expect(() => insertFeedbackStatement.run(articleId, feedbackReason)).not.toThrow()
+    }
   })
 
   it('n ajoute aucune source à une base jamais initialisée', () => {

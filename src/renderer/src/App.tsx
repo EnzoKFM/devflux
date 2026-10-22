@@ -15,7 +15,7 @@ import { useUserProfile } from './hooks/useUserProfile'
 import type { ViewId } from './lib/labels'
 
 function MainApplication() {
-  const { digestResource, preparationProgress, retryPreparation } = useDailyDigest()
+  const { digestResource, preparationProgress, retryPreparation, refreshDigest } = useDailyDigest()
   const { applyArticlePatch, applyPatchesToArticles } = useArticlePatches()
   const [currentViewId, setCurrentViewId] = useState<ViewId>('today')
 
@@ -37,6 +37,7 @@ function MainApplication() {
             digest={digestResource.value}
             patchedArticlesOf={applyPatchesToArticles}
             applyArticlePatch={applyArticlePatch}
+            onRefresh={refreshDigest}
           />
         )
       case 'read-later':

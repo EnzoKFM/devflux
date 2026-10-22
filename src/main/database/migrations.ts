@@ -156,6 +156,25 @@ export const MIGRATIONS: string[] = [
   END;
 
   INSERT INTO articles_fts (articles_fts) VALUES ('rebuild');
+  `,
+  `
+  CREATE TABLE feedback_with_extended_reasons (
+    article_id INTEGER PRIMARY KEY REFERENCES articles(id) ON DELETE CASCADE,
+    rating TEXT NOT NULL CHECK (rating IN ('like', 'dislike')),
+    reason TEXT CHECK (reason IN (
+      'off-topic', 'not-interesting', 'too-basic', 'too-advanced', 'not-french',
+      'promotional', 'clickbait', 'already-seen', 'bad-source'
+    )),
+    created_at TEXT NOT NULL
+  );
+
+  INSERT INTO feedback_with_extended_reasons (article_id, rating, reason, created_at)
+  SELECT article_id, rating, reason, created_at FROM feedback;
+
+  DROP TABLE feedback;
+  ALTER TABLE feedback_with_extended_reasons RENAME TO feedback;
+
+  ALTER TABLE articles ADD COLUMN is_digest_replaced INTEGER NOT NULL DEFAULT 0;
   `
 ]
 

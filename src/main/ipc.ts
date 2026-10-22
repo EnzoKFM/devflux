@@ -18,7 +18,7 @@ import {
   setAutostartEnabled,
   type AutostartContext
 } from './autostart'
-import { prepareDailyDigest } from './digest/dailyDigestService'
+import { prepareDailyDigest, refreshDailyDigest } from './digest/dailyDigestService'
 import { buildDigestReadyNotification } from './digest/digestNotification'
 import { buildFavoritesMarkdown } from './exports/favoritesMarkdown'
 import {
@@ -103,13 +103,17 @@ async function saveTextFile(
 export function registerIpcHandlers({ database, autostartContext, embeddingProvider }: IpcDependencies): void {
   let pendingPreparation: Promise<DailyDigest> | null = null
 
+  const createProgressSender =
+    (event: IpcMainInvokeEvent) =>
+    (progress: PreparationProgress): void => {
+      if (!event.sender.isDestroyed()) {
+        event.sender.send(IPC_CHANNELS.preparationProgress, progress)
+      }
+    }
+
   ipcMain.handle(IPC_CHANNELS.prepareDailyDigest, (event: IpcMainInvokeEvent): Promise<DailyDigest> => {
     if (!pendingPreparation) {
-      const sendProgress = (progress: PreparationProgress): void => {
-        if (!event.sender.isDestroyed()) {
-          event.sender.send(IPC_CHANNELS.preparationProgress, progress)
-        }
-      }
+      const sendProgress = createProgressSender(event)
       const digestWindow = BrowserWindow.fromWebContents(event.sender)
       pendingPreparation = prepareDailyDigest(database, { embeddingProvider, onProgress: sendProgress })
         .then((dailyDigest) => {
@@ -119,6 +123,18 @@ export function registerIpcHandlers({ database, autostartContext, embeddingProvi
         .finally(() => {
           pendingPreparation = null
         })
+    }
+    return pendingPreparation
+  })
+
+  ipcMain.handle(IPC_CHANNELS.refreshDailyDigest, (event: IpcMainInvokeEvent): Promise<DailyDigest> => {
+    if (!pendingPreparation) {
+      pendingPreparation = refreshDailyDigest(database, {
+        embeddingProvider,
+        onProgress: createProgressSender(event)
+      }).finally(() => {
+        pendingPreparation = null
+      })
     }
     return pendingPreparation
   })

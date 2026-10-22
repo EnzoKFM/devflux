@@ -38,6 +38,20 @@ describe('classifyContentSignal et resolveSourceVote', () => {
     expect(resolveSourceVote(buildRatedArticle('dislike', 'bad-source'))).toBe(-1)
     expect(resolveSourceVote(buildRatedArticle('dislike', 'already-seen'))).toBe(0)
   })
+
+  it('distingue l article de sa source pour les raisons de 👎 ajoutées', () => {
+    expect(classifyContentSignal(buildRatedArticle('dislike', 'not-interesting'))).toBe('negative')
+    expect(classifyContentSignal(buildRatedArticle('dislike', 'too-advanced'))).toBe('negative')
+    expect(classifyContentSignal(buildRatedArticle('dislike', 'promotional'))).toBe('negative')
+    expect(classifyContentSignal(buildRatedArticle('dislike', 'clickbait'))).toBe('negative')
+    expect(classifyContentSignal(buildRatedArticle('dislike', 'not-french'))).toBe('none')
+
+    expect(resolveSourceVote(buildRatedArticle('dislike', 'not-interesting'))).toBe(0)
+    expect(resolveSourceVote(buildRatedArticle('dislike', 'too-advanced'))).toBe(0)
+    expect(resolveSourceVote(buildRatedArticle('dislike', 'promotional'))).toBe(-1)
+    expect(resolveSourceVote(buildRatedArticle('dislike', 'clickbait'))).toBe(-1)
+    expect(resolveSourceVote(buildRatedArticle('dislike', 'not-french'))).toBe(-1)
+  })
 })
 
 describe('determineRecommendationMode', () => {

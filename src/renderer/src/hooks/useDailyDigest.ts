@@ -1,9 +1,13 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { PreparationProgress } from '@shared/contract'
 import { useAsyncResource } from './useAsyncResource'
 
 export function useDailyDigest() {
-  const digestResource = useAsyncResource(() => window.devflux.prepareDailyDigest(), 'daily-digest')
+  const isRefreshRequestedRef = useRef(false)
+  const digestResource = useAsyncResource(
+    () => (isRefreshRequestedRef.current ? window.devflux.refreshDailyDigest() : window.devflux.prepareDailyDigest()),
+    'daily-digest'
+  )
   const [preparationProgress, setPreparationProgress] = useState<PreparationProgress | null>(null)
   const { reload: reloadDigest } = digestResource
 
@@ -14,5 +18,11 @@ export function useDailyDigest() {
     reloadDigest()
   }, [reloadDigest])
 
-  return { digestResource, preparationProgress, retryPreparation }
+  const refreshDigest = useCallback(() => {
+    isRefreshRequestedRef.current = true
+    setPreparationProgress(null)
+    reloadDigest()
+  }, [reloadDigest])
+
+  return { digestResource, preparationProgress, retryPreparation, refreshDigest }
 }

@@ -5,7 +5,19 @@ export const SEARCH_QUERY_MAX_LENGTH = 200
 
 export type FeedbackRating = 'like' | 'dislike'
 
-export type FeedbackReason = 'off-topic' | 'too-basic' | 'already-seen' | 'bad-source'
+export const FEEDBACK_REASONS = [
+  'off-topic',
+  'not-interesting',
+  'too-basic',
+  'too-advanced',
+  'not-french',
+  'promotional',
+  'clickbait',
+  'already-seen',
+  'bad-source'
+] as const
+
+export type FeedbackReason = (typeof FEEDBACK_REASONS)[number]
 
 export type SourceCategory = 'web' | 'software' | 'general'
 
@@ -128,6 +140,7 @@ export interface UserProfile {
 
 export interface DevFluxApi {
   prepareDailyDigest(): Promise<DailyDigest>
+  refreshDailyDigest(): Promise<DailyDigest>
   onPreparationProgress(listener: (progress: PreparationProgress) => void): () => void
   listReadLaterArticles(): Promise<DigestArticle[]>
   listFavoriteArticles(): Promise<DigestArticle[]>
@@ -157,6 +170,7 @@ export interface DevFluxApi {
 
 export const IPC_CHANNELS = {
   prepareDailyDigest: 'digest:prepare',
+  refreshDailyDigest: 'digest:refresh',
   preparationProgress: 'digest:progress',
   listReadLaterArticles: 'articles:list-read-later',
   listFavoriteArticles: 'articles:list-favorites',

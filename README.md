@@ -31,6 +31,7 @@ Depuis un terminal intégré à VS Code, la variable `ELECTRON_RUN_AS_NODE=1` pe
 ## Fonctionnement
 
 - **Au lancement** : le fil du jour n'est construit qu'une fois par jour. Les lancements suivants du même jour réaffichent le même fil sans nouvelle collecte.
+- **Actualiser les articles** : le bouton du fil du jour relance la collecte et remplace le fil par des articles jamais affichés, choisis avec les 👍 / 👎 donnés jusque-là. Les articles remplacés restent dans favoris, plus tard et la recherche. Si aucun nouvel article n'est disponible, le fil courant est conservé.
 - **Préparation** :
   1. Purge des articles de plus de 14 jours, sauf les favoris, les « plus tard » et les articles notés.
   2. Collecte des sources actives : seuls les articles détectés en français sont enregistrés, après vérification de leur page (voir **Langue**).
@@ -43,7 +44,7 @@ Depuis un terminal intégré à VS Code, la variable `ELECTRON_RUN_AS_NODE=1` pe
 - **Recherche** : vue **Recherche**, plein texte (SQLite FTS5) sur le titre, le résumé et le nom de la source de tous les articles conservés, insensible à la casse et aux accents ; chaque mot est cherché comme préfixe et tous doivent être présents ; 50 résultats au plus, triés par pertinence puis du plus récent au plus ancien.
 - **Export des favoris** : bouton « Exporter en Markdown » de la vue **Favoris** (liste de liens avec source, date et résumé).
 - **Articles vus** : un article affiché dans un fil n'est jamais reproposé. Le bouton « Plus tard » permet de le garder.
-- **Notes** : les 👍 / 👎 et leur raison sont conservés dans la table `feedback` et pris en compte dès le fil du lendemain.
+- **Notes** : les 👍 / 👎 et leur raison sont conservés dans la table `feedback` et pris en compte dès le fil du lendemain ou la prochaine actualisation.
 - **Premier lancement** : choix des sujets suivis, modifiables ensuite dans **Mon profil** (Suivi / Neutre / Masqué).
 - **Raccourcis clavier** (listes d'articles, hors champ de saisie) : `j` / `k` article suivant / précédent, `l` 👍, `d` 👎 (ouvre le choix de la raison).
 - **Thème** : Système (par défaut), Clair ou Sombre, dans **Réglages**.
@@ -64,7 +65,7 @@ Depuis un terminal intégré à VS Code, la variable `ELECTRON_RUN_AS_NODE=1` pe
 ## Recommandation locale
 
 - **Modèle** : `Xenova/paraphrase-multilingual-MiniLM-L12-v2`, multilingue (français et anglais comparés dans le même espace), épinglé sur la révision `2c4055b12046f11709e9df2c122e59ffbdc2f900` (q8, environ 130 Mo), téléchargé une seule fois dans `~/.config/DevFlux/models`. Il tourne dans un processus séparé (`utilityProcess`), lancé seulement pendant l'analyse puis arrêté : pic mesuré d'environ 550 Mo pendant quelques secondes.
-- **Signaux** : 👍 et sujets suivis attirent ; 👎 « hors sujet », « trop basique » ou sans raison et sujets masqués repoussent ; « déjà vu » est neutre ; « mauvaise source » pénalise uniquement la source.
+- **Signaux** : 👍 et sujets suivis attirent ; 👎 « hors sujet », « trop basique », « promo / pub », « titre trompeur » ou sans raison repoussent le sujet et pénalisent la source ; les sujets masqués repoussent le sujet ; « pas intéressant » et « trop pointu » repoussent le sujet sans toucher à la source ; « article non-français » et « source pas intéressante » pénalisent uniquement la source ; « déjà vu » est neutre.
 - **Sujets masqués** : un article dont le sujet le plus proche est masqué (similarité d'au moins 0,35) est exclu du fil, dans les modes `similarity` et `trained`.
 - **Modes** :
   - `cold-start` (ni note ni sujet) : sélection en tourniquet, un article par source et par tour, du plus récent au plus ancien ;

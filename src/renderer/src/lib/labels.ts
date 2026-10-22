@@ -7,7 +7,12 @@ export interface FeedbackReasonChoice {
 
 export const FEEDBACK_REASON_CHOICES: FeedbackReasonChoice[] = [
   { reason: 'off-topic', label: 'Hors sujet' },
+  { reason: 'not-interesting', label: 'Pas intéressant' },
   { reason: 'too-basic', label: 'Trop basique' },
+  { reason: 'too-advanced', label: 'Trop pointu' },
+  { reason: 'not-french', label: 'Article non-français' },
+  { reason: 'promotional', label: 'Promo / pub' },
+  { reason: 'clickbait', label: 'Titre trompeur' },
   { reason: 'already-seen', label: 'Déjà vu' },
   { reason: 'bad-source', label: 'Source pas intéressante' },
   { reason: null, label: 'Sans raison' }

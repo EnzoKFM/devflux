@@ -14,7 +14,7 @@ import {
 import { getUserProfile } from '../profile/profileService'
 import { listFavoriteArticles, listReadLaterArticles } from '../repositories/articleRepository'
 import { MAX_DIGEST_ARTICLES_PER_SOURCE } from '../recommendation/selection'
-import { formatLocalDate, prepareDailyDigest, purgeExpiredArticles } from './dailyDigestService'
+import { formatLocalDate, prepareDailyDigest, purgeExpiredArticles, refreshDailyDigest } from './dailyDigestService'
 
 describe('formatLocalDate', () => {
   it('formate la date en heure locale', () => {
@@ -188,6 +188,89 @@ describe('prepareDailyDigest', () => {
   })
 })
 
+describe('refreshDailyDigest', () => {
+  function seedArticlesFromDistinctSources(database: ReturnType<typeof createTestDatabase>, articleCount: number): void {
+    for (let articleNumber = 1; articleNumber <= articleCount; articleNumber += 1) {
+      const sourceId = addTestSource(database, `Blog ${articleNumber}`)
+      insertTestArticle(database, {
+        sourceId,
+        slug: `article-${articleNumber}`,
+        publishedAt: daysBefore(FIXED_NOW, 1 + articleNumber * 0.001)
+      })
+    }
+  }
+
+  it('remplace le fil du jour par des articles jamais affichés', async () => {
+    const database = createTestDatabase()
+    seedArticlesFromDistinctSources(database, DAILY_DIGEST_SIZE + 5)
+    const emptyFeedFetcher = async () => ({ entries: [] })
+
+    const firstDigest = await prepareDailyDigest(database, { fetchFeed: emptyFeedFetcher, now: () => FIXED_NOW })
+    const refreshedDigest = await refreshDailyDigest(database, { fetchFeed: emptyFeedFetcher, now: () => FIXED_NOW })
+
+    const firstArticleIds = new Set(firstDigest.articles.map((article) => article.id))
+    expect(firstDigest.articles).toHaveLength(DAILY_DIGEST_SIZE)
+    expect(refreshedDigest.articles).toHaveLength(5)
+    expect(refreshedDigest.articles.some((article) => firstArticleIds.has(article.id))).toBe(false)
+    expect(refreshedDigest.digestDate).toBe(firstDigest.digestDate)
+    expect(refreshedDigest.collectionReport).not.toBeNull()
+  })
+
+  it('réaffiche le fil actualisé aux lancements suivants du même jour', async () => {
+    const database = createTestDatabase()
+    seedArticlesFromDistinctSources(database, DAILY_DIGEST_SIZE + 5)
+    let fetchCount = 0
+    const fetchFeed = async () => {
+      fetchCount += 1
+      return { entries: [] }
+    }
+
+    await prepareDailyDigest(database, { fetchFeed, now: () => FIXED_NOW })
+    const refreshedDigest = await refreshDailyDigest(database, { fetchFeed, now: () => FIXED_NOW })
+    const fetchCountAfterRefresh = fetchCount
+    const relaunchedDigest = await prepareDailyDigest(database, { fetchFeed, now: () => FIXED_NOW })
+
+    expect(fetchCount).toBe(fetchCountAfterRefresh)
+    expect(relaunchedDigest.collectionReport).toBeNull()
+    expect(relaunchedDigest.articles.map((article) => article.id)).toEqual(
+      refreshedDigest.articles.map((article) => article.id)
+    )
+  })
+
+  it('conserve le fil courant quand aucun nouvel article n est disponible', async () => {
+    const database = createTestDatabase()
+    seedArticlesFromDistinctSources(database, 3)
+    const emptyFeedFetcher = async () => ({ entries: [] })
+
+    const firstDigest = await prepareDailyDigest(database, { fetchFeed: emptyFeedFetcher, now: () => FIXED_NOW })
+    const refreshedDigest = await refreshDailyDigest(database, { fetchFeed: emptyFeedFetcher, now: () => FIXED_NOW })
+
+    expect(refreshedDigest.articles.map((article) => article.id)).toEqual(firstDigest.articles.map((article) => article.id))
+  })
+
+  it('laisse les articles remplacés dans favoris et plus tard', async () => {
+    const database = createTestDatabase()
+    const sourceId = addTestSource(database, 'Blog Un')
+    insertTestArticle(database, {
+      sourceId,
+      slug: 'favori-du-jour',
+      publishedAt: daysBefore(FIXED_NOW, 1),
+      digestDate: formatLocalDate(FIXED_NOW),
+      isFavorite: true,
+      isReadLater: true
+    })
+    insertTestArticle(database, { sourceId: addTestSource(database, 'Blog Deux'), slug: 'nouveau', publishedAt: daysBefore(FIXED_NOW, 1) })
+
+    const refreshedDigest = await refreshDailyDigest(database, { fetchFeed: async () => ({ entries: [] }), now: () => FIXED_NOW })
+
+    expect(refreshedDigest.articles.map((article) => article.url)).toEqual(['https://blog.example.com/nouveau'])
+    expect(listFavoriteArticles(database).map((article) => article.url)).toEqual(['https://blog.example.com/favori-du-jour'])
+    expect(listReadLaterArticles(database).map((article) => article.url)).toEqual([
+      'https://blog.example.com/favori-du-jour'
+    ])
+  })
+})
+
 describe('purgeExpiredArticles', () => {
   it('supprime les articles de plus de 14 jours sauf favoris, plus tard et notés', () => {
     const database = createTestDatabase()
@@ -343,6 +426,26 @@ describe('recommandation locale dans le fil', () => {
       .map((article, articlePosition) => (article.isExploration ? articlePosition : -1))
       .filter((articlePosition) => articlePosition >= 0)
     expect(explorationPositions).toEqual([6, 13])
+    expect(getUserProfile(database).recommendationMode).toBe('similarity')
+  })
+
+  it('tient compte à l actualisation des 👍 donnés depuis la préparation du fil', async () => {
+    const database = createTestDatabase()
+    seedTopicArticles(database, 'rust', 30, 1)
+    seedTopicArticles(database, 'python', 30, 5)
+    const embeddingProvider = createKeywordEmbeddingProvider(['rust', 'python'])
+
+    const firstDigest = await prepareDailyDigest(database, { fetchFeed: emptyFeedFetcher, now: () => FIXED_NOW, embeddingProvider })
+    rateTopicArticles(database, 'python', 'like', 1)
+    const refreshedDigest = await refreshDailyDigest(database, {
+      fetchFeed: emptyFeedFetcher,
+      now: () => FIXED_NOW,
+      embeddingProvider,
+      random: () => 0
+    })
+
+    expect(firstDigest.articles.every((article) => article.url.includes('/rust-'))).toBe(true)
+    expect(refreshedDigest.articles.slice(0, 6).every((article) => article.url.includes('/python-'))).toBe(true)
     expect(getUserProfile(database).recommendationMode).toBe('similarity')
   })
 

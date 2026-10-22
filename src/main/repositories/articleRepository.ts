@@ -177,7 +177,7 @@ export function requireArticle(database: Database.Database, articleId: number): 
 
 export function listArticlesByDigestDate(database: Database.Database, digestDate: string): DigestArticle[] {
   const articleRows = database
-    .prepare(`${ARTICLE_SELECT} WHERE articles.digest_date = ? ${DIGEST_ARTICLE_ORDER}`)
+    .prepare(`${ARTICLE_SELECT} WHERE articles.digest_date = ? AND articles.is_digest_replaced = 0 ${DIGEST_ARTICLE_ORDER}`)
     .all(digestDate) as ArticleRow[]
   return articleRows.map(mapArticleRow)
 }
@@ -238,6 +238,12 @@ export function listDigestCandidates(database: Database.Database, publishedSince
     summary: candidateRow.summary,
     publishedAt: candidateRow.published_at
   }))
+}
+
+export function markDigestAsReplaced(database: Database.Database, digestDate: string): void {
+  database
+    .prepare('UPDATE articles SET is_digest_replaced = 1 WHERE digest_date = ? AND is_digest_replaced = 0')
+    .run(digestDate)
 }
 
 export function assignDigestSelections(

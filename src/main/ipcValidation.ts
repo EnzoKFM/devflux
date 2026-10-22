@@ -1,4 +1,5 @@
 import {
+  FEEDBACK_REASONS,
   SEARCH_QUERY_MAX_LENGTH,
   THEME_PREFERENCES,
   type FeedbackRating,
@@ -13,7 +14,6 @@ import { isSourceCategory, SOURCE_CATEGORIES } from './sources/sourceCategory'
 import { isThemePreference } from './theme'
 
 const FEEDBACK_RATINGS: readonly FeedbackRating[] = ['like', 'dislike']
-const FEEDBACK_REASONS: readonly FeedbackReason[] = ['off-topic', 'too-basic', 'already-seen', 'bad-source']
 const TOPIC_PREFERENCES: readonly TopicPreference[] = ['followed', 'neutral', 'muted']
 
 export function parseIdentifier(value: unknown, argumentName: string): number {

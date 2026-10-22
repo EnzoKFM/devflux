@@ -3,6 +3,7 @@ import { IPC_CHANNELS, type DevFluxApi, type PreparationProgress } from '@shared
 
 const devFluxApi: DevFluxApi = {
   prepareDailyDigest: () => ipcRenderer.invoke(IPC_CHANNELS.prepareDailyDigest),
+  refreshDailyDigest: () => ipcRenderer.invoke(IPC_CHANNELS.refreshDailyDigest),
   onPreparationProgress: (listener) => {
     const progressHandler = (_event: IpcRendererEvent, progress: PreparationProgress): void => listener(progress)
     ipcRenderer.on(IPC_CHANNELS.preparationProgress, progressHandler)

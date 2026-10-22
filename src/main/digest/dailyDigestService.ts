@@ -17,6 +17,7 @@ import {
   assignDigestSelections,
   listArticlesByDigestDate,
   listDigestCandidates,
+  markDigestAsReplaced,
   purgeArticlesPublishedBefore,
   type DigestCandidate,
   type DigestSelection
@@ -78,13 +79,19 @@ export function buildDigest(
   digestDate: string,
   candidates: DigestCandidate[],
   recommendation: Omit<RecommendedSelectionOptions, 'database' | 'candidates' | 'now'> | null = null,
-  roundRobinMode: RecommendationMode = 'cold-start'
+  roundRobinMode: RecommendationMode = 'cold-start',
+  shouldReplaceCurrentDigest = false
 ): void {
   const digestSelections = recommendation
     ? selectByRecommendation({ ...recommendation, database, candidates, now })
     : selectByRoundRobin(candidates, roundRobinMode)
 
-  assignDigestSelections(database, digestSelections, digestDate)
+  database.transaction(() => {
+    if (shouldReplaceCurrentDigest && digestSelections.length > 0) {
+      markDigestAsReplaced(database, digestDate)
+    }
+    assignDigestSelections(database, digestSelections, digestDate)
+  })()
 }
 
 export async function prepareDailyDigest(
@@ -99,6 +106,24 @@ export async function prepareDailyDigest(
     return { digestDate, articles: existingArticles, collectionReport: null }
   }
 
+  return collectAndBuildDigest(database, now, digestDate, options, false)
+}
+
+export async function refreshDailyDigest(
+  database: Database.Database,
+  options: PrepareDailyDigestOptions = {}
+): Promise<DailyDigest> {
+  const now = options.now ?? (() => new Date())
+  return collectAndBuildDigest(database, now, formatLocalDate(now()), options, true)
+}
+
+async function collectAndBuildDigest(
+  database: Database.Database,
+  now: () => Date,
+  digestDate: string,
+  options: PrepareDailyDigestOptions,
+  shouldReplaceCurrentDigest: boolean
+): Promise<DailyDigest> {
   const totalSourceCount = listEnabledSources(database).length
   const reportProgress = (step: PreparationProgress['step'], completedSourceCount: number): void =>
     options.onProgress?.({ step, completedSourceCount, totalSourceCount })
@@ -136,7 +161,8 @@ export async function prepareDailyDigest(
           random: options.random ?? Math.random
         }
       : null,
-    recommendationAnalysis.mode
+    recommendationAnalysis.mode,
+    shouldReplaceCurrentDigest
   )
   recordLastDigestMode(database, recommendationAnalysis.mode)
 
